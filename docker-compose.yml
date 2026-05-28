@@ -10,7 +10,7 @@ services:
       # タイムゾーンの設定
       TZ: Asia/Tokyo
     ports:
-      - "5432:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       # データの永続化（ホストの postgres_data フォルダに保存）
       - ./postgres_data:/var/lib/postgresql/data
