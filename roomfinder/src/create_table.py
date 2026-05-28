@@ -19,8 +19,33 @@ db_config = {
 }
 
 
+create_table_railway = """
+DROP TABLE IF EXISTS railway_stations;
+CREATE TABLE railway_stations (
+    id SERIAL PRIMARY KEY,
+    name TEXT NOT NULL,
+    line_name TEXT NOT NULL,
+    geom Geometry(Point, 4326) NOT NULL
+);
+CREATE INDEX idx_railway_stations_geom ON railway_stations USING GiST (geom);
+"""
+
+
 def db_connect(**config):
     return psycopg2.connect(**config)
+
+
+def crate_table(cur, query):
+    """
+    引数で受け取ったクエリを実行し、テーブルを生成する
+    Args:
+        cur: カーソル
+        query: CREATE TABLE文が書かれた文字列
+    """
+
+    cur.execute(query)
+    execute_query = cur.mogrify(query).decode("utf-8")
+    print(f"EXECUTE SQL: {execute_query}")
 
 
 if __name__ == "__main__":
@@ -30,7 +55,7 @@ if __name__ == "__main__":
         with db_connect(**db_config) as conn:
             print(f"DB: {database_name} に接続しました。")
             with conn.cursor() as cur:
-                pass
+                crate_table(cur, create_table_railway)
 
     except psycopg2.OperationalError as e:
         print(f"データベース接続エラー: {e}")
