@@ -12,3 +12,5 @@
 *.pyc
 .DS_Store
 Thumbs.db
+input_data
+work
