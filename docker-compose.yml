@@ -1,0 +1,18 @@
+services:
+  db:
+    build: ./docker
+    platform: linux/arm64
+    image: tr-gis-postgis-16-arm
+    container_name: postgres-container
+    restart: always
+    env_file: .env
+    environment:
+      # タイムゾーンの設定
+      TZ: Asia/Tokyo
+    ports:
+      - "5432:5432"
+    volumes:
+      # データの永続化（ホストの postgres_data フォルダに保存）
+      - ./postgres_data:/var/lib/postgresql/data
+      # 初期化スクリプトの配置（コンテナ起動時に自動実行される）
+      - ./init:/docker-entrypoint-initdb.d

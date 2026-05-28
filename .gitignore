@@ -1,0 +1,14 @@
+# すべてを一旦除外対象にする
+/*
+
+# 管理したいもの（☆印）を例外として許可する
+!.gitignore
+!/docker/
+!/docker-compose.yml
+!/roomfinder/
+
+# (任意) roomfinder内などの一時ファイルを除外したい場合
+**/__pycache__/
+*.pyc
+.DS_Store
+Thumbs.db
