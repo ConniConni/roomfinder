@@ -19,7 +19,7 @@ db_config = {
 }
 
 
-create_table_railway = """
+create_table_railway_stations = """
 DROP TABLE IF EXISTS railway_stations;
 CREATE TABLE railway_stations (
     id SERIAL PRIMARY KEY,
@@ -55,7 +55,7 @@ if __name__ == "__main__":
         with db_connect(**db_config) as conn:
             print(f"DB: {database_name} に接続しました。")
             with conn.cursor() as cur:
-                crate_table(cur, create_table_railway)
+                crate_table(cur, create_table_railway_stations)
 
     except psycopg2.OperationalError as e:
         print(f"データベース接続エラー: {e}")
