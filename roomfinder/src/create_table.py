@@ -30,6 +30,33 @@ CREATE TABLE railway_stations (
 CREATE INDEX idx_railway_stations_geom ON railway_stations USING GiST (geom);
 """
 
+create_table_supermarkets = """
+DROP TABLE IF EXISTS supermarkets;
+CREATE TABLE supermarkets (
+    id SERIAL PRIMARY KEY,
+    name TEXT NOT NULL,
+    geom Geometry(Point, 4326) NOT NULL
+);
+CREATE INDEX idx_supermarkets_geom ON supermarkets USING GiST (geom);
+"""
+
+create_table_properties = """
+DROP TABLE IF EXISTS properties;
+CREATE TABLE properties (
+    id SERIAL PRIMARY KEY,
+    name TEXT NOT NULL,
+    rent INT NOT NULL,
+    geom Geometry(Point, 4326) NOT NULL
+);
+CREATE INDEX idx_properties_geom ON properties USING GiST (geom);
+"""
+
+execute_query_list = [
+    create_table_railway_stations,
+    create_table_supermarkets,
+    create_table_properties,
+]
+
 
 def db_connect(**config):
     return psycopg2.connect(**config)
@@ -55,7 +82,8 @@ if __name__ == "__main__":
         with db_connect(**db_config) as conn:
             print(f"DB: {database_name} に接続しました。")
             with conn.cursor() as cur:
-                crate_table(cur, create_table_railway_stations)
+                for query in execute_query_list:
+                    crate_table(cur, query)
 
     except psycopg2.OperationalError as e:
         print(f"データベース接続エラー: {e}")
