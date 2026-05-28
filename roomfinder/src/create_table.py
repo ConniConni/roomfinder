@@ -25,11 +25,10 @@ def db_connect(**config):
 
 if __name__ == "__main__":
 
-    conn = db_connect(**db_config)
-    if conn:
+    with db_connect(**db_config) as conn:
         print(f"DB: {database_name} に接続しました。")
-    else:
-        print("DB接続に失敗しました。")
+        with conn.cursor() as cur:
+            pass
 
     if conn:
         conn.close()
