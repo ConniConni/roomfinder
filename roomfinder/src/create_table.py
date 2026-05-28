@@ -2,23 +2,6 @@ import os
 import psycopg2
 from dotenv import load_dotenv
 
-load_dotenv()
-
-port_num = os.getenv("POSTGRES_PORT")
-database_name = os.getenv("POSTGRES_DB")
-user_name = os.getenv("POSTGRES_USER")
-password = os.getenv("POSTGRES_PASSWORD")
-
-
-db_config = {
-    "host": "localhost",
-    "port": port_num,
-    "database": database_name,
-    "user": user_name,
-    "password": password,
-}
-
-
 create_table_railway_stations = """
 DROP TABLE IF EXISTS railway_stations;
 CREATE TABLE railway_stations (
@@ -58,6 +41,26 @@ execute_query_list = [
 ]
 
 
+def get_db_config_property():
+    """envファイルを読み込み、DB接続情報を辞書型で返す"""
+    load_dotenv()
+
+    port = os.getenv("POSTGRES_PORT")
+    database = os.getenv("POSTGRES_DB")
+    user = os.getenv("POSTGRES_USER")
+    password = os.getenv("POSTGRES_PASSWORD")
+
+    config = {
+        "host": "localhost",
+        "port": port,
+        "database": database,
+        "user": user,
+        "password": password,
+    }
+
+    return config
+
+
 def db_connect(**config):
     return psycopg2.connect(**config)
 
@@ -79,8 +82,9 @@ if __name__ == "__main__":
 
     conn = None
     try:
+        db_config = get_db_config_property()
         with db_connect(**db_config) as conn:
-            print(f"DB: {database_name} に接続しました。")
+            print(f"DB: {db_config['database']} に接続しました。")
             with conn.cursor() as cur:
                 for query in execute_query_list:
                     crate_table(cur, query)
@@ -97,6 +101,6 @@ if __name__ == "__main__":
     finally:
         if conn:
             conn.close()
-            print(f"DB: {database_name} を接断しました。")
+            print(f"DB: {db_config['database']} を接断しました。")
         else:
             print(f"DB接続に失敗しました。")
