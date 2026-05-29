@@ -38,22 +38,24 @@ def db_connect(**config):
     return psycopg2.connect(**config)
 
 
-def execute_insert_query(cur, table, query_body, params=None):
-    """
-    引数で受け取ったsqlを実行する
-    Args:
-        cur: カーソル
-        table: データを挿入するテーブル名
-        sql: 実行するsql文
-        params: sqlに埋め込むパラメータ デフォルトはNone
-    """
-
+def execute_truncate_query(cur, table):
     query = sql.SQL("TRUNCATE TABLE {} CASCADE;").format(sql.Identifier(table))
     cur.execute(query)
     print(f"EXECUTE SQL: {cur.mogrify(query).decode('utf-8')}")
 
-    cur.execute(query_body, params)
-    print(f"EXECUTE SQL: {cur.mogrify(query_body, params).decode('utf-8')}")
+
+def execute_insert_query(cur, param):
+    """
+    引数で受け取ったsqlを実行する
+    Args:
+        cur: カーソル
+        params: sqlに埋め込むパラメータ
+    """
+    query = """
+        INSERT INTO railway_stations (name, line_name, geom) VALUES (%s, %s, ST_GeomFromText(%s, 4326));
+    """
+    cur.execute(query, param)
+    print(f"EXECUTE SQL: {cur.mogrify(query, param).decode('utf-8')}")
 
 
 def export_shape_file(path):
@@ -112,10 +114,10 @@ if __name__ == "__main__":
             print(f"DB: {db_config['database']} に接続しました。")
             with conn.cursor() as cur:
 
-                # データクレンジング
+                execute_truncate_query(cur, "railway_stations")
                 # INSERT文組み立て
-                query = "INSERT INTO railway_stations (name, line_name, geom) VALUES ('天神', '貫線', ST_GeomFromText('POINT(130.39863 33.59126)', 4326));"
-                execute_insert_query(cur, "railway_stations", query)
+                for param in params:
+                    execute_insert_query(cur, param)
                 print("○件のデータを登録しました。")
 
     except psycopg2.OperationalError as e:
