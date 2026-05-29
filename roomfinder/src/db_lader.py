@@ -77,12 +77,44 @@ def export_shape_file(path):
     return gdf
 
 
+def format_data_for_params(gdf):
+    """
+    受け取ったgdfのデータをクエリのパラメータに使える形に変換する
+    Args:
+        gdf: shapeファイルを読み取り生成したGeoDataFrame
+    return:
+        params_list: 変換後のデータのリスト 要素は(name, railway_name, 'POINT(lng lat)')
+    """
+
+    lines = gdf["geometry"]
+    geometry = []
+
+    for i in range(len(lines)):
+        # 座標（緯度経度）のリストを抽出する
+        coordinates = list(lines[i].coords)
+        lng_value = 0
+        lat_value = 0
+        for lng_lat in coordinates:
+            lng, lat = lng_lat
+            lng_value += lng
+            lat_value += lat
+        lng_value = lng_value / 2
+        lat_value = lat_value / 2
+        geom = f"POINT({lng_value} {lat_value})"
+        geometry.append(geom)
+
+    params_list = zip(gdf["N02_005"], gdf["N02_003"], geometry)
+    return params_list
+
+
 if __name__ == "__main__":
     # ファイルの読み込みに失敗した場合はDB接続せずに異常終了する。
     gdf_shp = export_shape_file(shapefile_path)
     if gdf_shp is None:
         print("[ERROR] 異常終了。")
         sys.exit(1)
+
+    params = format_data_for_params(gdf_shp)
 
     conn = None
     db_config = get_db_config_property()
