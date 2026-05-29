@@ -1,8 +1,17 @@
 import os
+import sys
+from pathlib import Path
+from pyogrio.errors import DataSourceError
 
+import geopandas as gpd
 import psycopg2
 from psycopg2 import sql
 from dotenv import load_dotenv
+
+# 読み込み対象のファイルパスを取得
+current_dir = Path(__file__).parent
+two_levels_up = current_dir.parent.parent
+shapefile_path = two_levels_up / "roomfinder/input_data/UTF-8/N02-22_Station.shp"
 
 
 def get_db_config_property():
@@ -47,14 +56,40 @@ def execute_insert_query(cur, table, query_body, params=None):
     print(f"EXECUTE SQL: {cur.mogrify(query_body, params).decode('utf-8')}")
 
 
+def export_shape_file(path):
+    """
+    引数で受け取ったshapeファイルを読み込む
+    Args:
+        path: ファイルパス
+    return: データ挿入に使用するリスト GeoDataFrame
+    """
+    gdf = None
+    shapefile_path = Path(path)
+    try:
+        gdf = gpd.read_file(shapefile_path)
+        print("Shapeファイルの読み込みに成功しました。")
+
+    except DataSourceError as e:
+        print(f"ファイルの指定が正しいか確認してください。: \n{e}")
+    except Exception as e:
+        print(f"予期せぬエラー: {e}")
+
+    return gdf
+
+
 if __name__ == "__main__":
+    # ファイルの読み込みに失敗した場合はDB接続せずに異常終了する。
+    gdf_shp = export_shape_file(shapefile_path)
+    if gdf_shp is None:
+        print("[ERROR] 異常終了。")
+        sys.exit(1)
+
     conn = None
     db_config = get_db_config_property()
-
     try:
         with db_connect(**db_config) as conn:
             with conn.cursor() as cur:
-                # データ読み込み
+
                 # データクレンジング
                 # INSERT文組み立て
                 query = "INSERT INTO railway_stations (name, line_name, geom) VALUES ('天神', '貫線', ST_GeomFromText('POINT(130.39863 33.59126)', 4326));"
