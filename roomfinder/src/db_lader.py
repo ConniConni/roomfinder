@@ -6,6 +6,7 @@ from pyogrio.errors import DataSourceError
 import geopandas as gpd
 import psycopg2
 from psycopg2 import sql
+from psycopg2.extras import execute_values
 from dotenv import load_dotenv
 
 # 読み込み対象のファイルパスを取得
@@ -44,7 +45,7 @@ def execute_truncate_query(cur, table):
     print(f"EXECUTE SQL: {cur.mogrify(query).decode('utf-8')}")
 
 
-def execute_insert_query(cur, param):
+def execute_insert_query(cur, params):
     """
     引数で受け取ったsqlを実行する
     Args:
@@ -52,10 +53,16 @@ def execute_insert_query(cur, param):
         params: sqlに埋め込むパラメータ
     """
     query = """
-        INSERT INTO railway_stations (name, line_name, geom) VALUES (%s, %s, ST_GeomFromText(%s, 4326));
+        INSERT INTO railway_stations (name, line_name, geom) VALUES %s;
     """
-    cur.execute(query, param)
-    print(f"EXECUTE SQL: {cur.mogrify(query, param).decode('utf-8')}")
+    execute_values(
+        cur,
+        query,
+        params,
+        template="(%s, %s, ST_GeomFromText(%s, 4326))",
+    )
+    # cur.execute(query, param)
+    # print(f"EXECUTE SQL: {cur.mogrify(query, param).decode('utf-8')}")
 
 
 def export_shape_file(path):
@@ -116,8 +123,9 @@ if __name__ == "__main__":
 
                 execute_truncate_query(cur, "railway_stations")
                 # INSERT文組み立て
-                for param in params:
-                    execute_insert_query(cur, param)
+                # for param in params:
+                #     execute_insert_query(cur, param)
+                execute_insert_query(cur, params)
                 print("○件のデータを登録しました。")
 
     except psycopg2.OperationalError as e:
