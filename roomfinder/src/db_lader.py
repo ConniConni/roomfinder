@@ -86,24 +86,13 @@ def format_data_for_params(gdf):
         params_list: 変換後のデータのリスト 要素は(name, railway_name, 'POINT(lng lat)')
     """
 
-    lines = gdf["geometry"]
-    geometry = []
+    # 国土数値情報の鉄道のgeometryはLINESTRINGなのでPOINTに変換するために中心点を取得する
+    # 変換前に一度メートル単位の座標系 (EPSG:6670) に変換し、重心を計算後、緯度経度 (EPSG:4326) に戻す
+    centroids = gdf.to_crs(epsg=6670).geometry.centroid.to_crs(epsg=4326)
+    print(centroids[0])
+    geometry_wkt = (f"POINT({point.y} {point.x})" for point in centroids)
 
-    for i in range(len(lines)):
-        # 座標（緯度経度）のリストを抽出する
-        coordinates = list(lines[i].coords)
-        lng_value = 0
-        lat_value = 0
-        for lng_lat in coordinates:
-            lng, lat = lng_lat
-            lng_value += lng
-            lat_value += lat
-        lng_value = lng_value / 2
-        lat_value = lat_value / 2
-        geom = f"POINT({lng_value} {lat_value})"
-        geometry.append(geom)
-
-    params_list = zip(gdf["N02_005"], gdf["N02_003"], geometry)
+    params_list = zip(gdf["N02_005"], gdf["N02_003"], geometry_wkt)
     return params_list
 
 
