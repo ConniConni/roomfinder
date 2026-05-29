@@ -66,7 +66,7 @@ def export_shape_file(path):
     gdf = None
     shapefile_path = Path(path)
     try:
-        gdf = gpd.read_file(shapefile_path)
+        gdf = gpd.read_file(shapefile_path, encoding="utf-8")
         print("Shapeファイルの読み込みに成功しました。")
 
     except DataSourceError as e:
