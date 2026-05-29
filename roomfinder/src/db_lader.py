@@ -45,12 +45,13 @@ def execute_truncate_query(cur, table):
     print(f"EXECUTE SQL: {cur.mogrify(query).decode('utf-8')}")
 
 
-def execute_insert_query(cur, params):
+def execute_insert_query(cur, params, count):
     """
     引数で受け取ったsqlを実行する
     Args:
         cur: カーソル
         params: sqlに埋め込むパラメータ
+        count: パラメータの要素数
     """
     query = """
         INSERT INTO railway_stations (name, line_name, geom) VALUES %s;
@@ -61,8 +62,7 @@ def execute_insert_query(cur, params):
         params,
         template="(%s, %s, ST_GeomFromText(%s, 4326))",
     )
-    # cur.execute(query, param)
-    # print(f"EXECUTE SQL: {cur.mogrify(query, param).decode('utf-8')}")
+    print(f"{count}件のデータを登録しました。")
 
 
 def export_shape_file(path):
@@ -102,7 +102,8 @@ def format_data_for_params(gdf):
     geometry_wkt = (f"POINT({point.y} {point.x})" for point in centroids)
 
     params_list = zip(gdf["N02_005"], gdf["N02_003"], geometry_wkt)
-    return params_list
+    record_count = len(gdf["N02_005"])
+    return params_list, record_count
 
 
 if __name__ == "__main__":
@@ -112,7 +113,7 @@ if __name__ == "__main__":
         print("[ERROR] 異常終了。")
         sys.exit(1)
 
-    params = format_data_for_params(gdf_shp)
+    params, record_count = format_data_for_params(gdf_shp)
 
     conn = None
     db_config = get_db_config_property()
@@ -125,8 +126,7 @@ if __name__ == "__main__":
                 # INSERT文組み立て
                 # for param in params:
                 #     execute_insert_query(cur, param)
-                execute_insert_query(cur, params)
-                print("○件のデータを登録しました。")
+                execute_insert_query(cur, params, record_count)
 
     except psycopg2.OperationalError as e:
         print(f"データベース接続エラー: {e}")
