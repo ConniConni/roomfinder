@@ -88,6 +88,7 @@ if __name__ == "__main__":
     db_config = get_db_config_property()
     try:
         with db_connect(**db_config) as conn:
+            print(f"DB: {db_config['database']} に接続しました。")
             with conn.cursor() as cur:
 
                 # データクレンジング
@@ -104,3 +105,9 @@ if __name__ == "__main__":
         print(f"psycopg2の一般的なエラー: {e}")
     except Exception as e:
         print(f"予期せぬエラー: {e}")
+    finally:
+        if conn:
+            conn.close()
+            print(f"DB: {db_config['database']} を接断しました。")
+        else:
+            print(f"DB接続に失敗しました。")
