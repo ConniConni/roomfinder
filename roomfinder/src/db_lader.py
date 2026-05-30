@@ -8,11 +8,14 @@ import psycopg2
 from psycopg2 import sql
 from psycopg2.extras import execute_values
 from dotenv import load_dotenv
+from shapely import box
 
 # 読み込み対象のファイルパスを取得
 current_dir = Path(__file__).parent
 two_levels_up = current_dir.parent.parent
 shapefile_path = two_levels_up / "roomfinder/input_data/UTF-8/N02-22_Station.shp"
+
+FUKUOKA_BBOX = box(130.0158, 33.2530, 130.2942, 33.5200)
 
 
 def get_db_config_property():
@@ -65,6 +68,20 @@ def execute_insert_query(cur, params, count):
     print(f"{count}件のデータを登録しました。")
 
 
+def extract_fukuoka_data(gdf):
+    """
+    引数で受け取ったGeoDataFrameから福岡市内のものだけを抽出する
+    Args:
+        gdf: 抽出対象のGeoDataFrame
+    return:
+        extract_fukuoka_gdf: 福岡市のみのデータを抽出したGeoDataFrame
+    """
+    mask = gdf.intersects(FUKUOKA_BBOX)
+    extract_fukuoka_gdf = gdf[mask]
+
+    return extract_fukuoka_gdf
+
+
 def export_shape_file(path):
     """
     引数で受け取ったshapeファイルを読み込む
@@ -112,8 +129,8 @@ if __name__ == "__main__":
     if gdf_shp is None:
         print("[ERROR] 異常終了。")
         sys.exit(1)
-
-    params, record_count = format_data_for_params(gdf_shp)
+    fukuoka_gdf = extract_fukuoka_data(gdf_shp)
+    params, record_count = format_data_for_params(fukuoka_gdf)
 
     conn = None
     db_config = get_db_config_property()
