@@ -111,7 +111,9 @@ def export_shape_file(path):
     return gdf
 
 
-def export_geojson_file(path):
+# 読み込み処理のため、export から load に関数名を変更
+# exportはファイル出力でよく使う
+def load_geojson_file(path):
     """
     引数で受け取ったshapeファイルを読み込む
     Args:
@@ -130,8 +132,6 @@ def export_geojson_file(path):
             )
             for i in range(len(features))
         )
-        # print(features[i]["properties"].setdefault("name", "店名不明"))
-        # print(features[i]["geometry"]["coordinates"])
         return gen
 
 
@@ -162,7 +162,7 @@ if __name__ == "__main__":
         sys.exit(1)
     params, record_count = format_data_for_params(gdf_shp)
 
-    supermarket_list = export_geojson_file(geojson_path)
+    supermarket_list = load_geojson_file(geojson_path)
 
     conn = None
     db_config = get_db_config_property()
