@@ -68,20 +68,6 @@ def execute_insert_query(cur, params, count):
     print(f"{count}件のデータを登録しました。")
 
 
-def extract_fukuoka_data(gdf):
-    """
-    引数で受け取ったGeoDataFrameから福岡市内のものだけを抽出する
-    Args:
-        gdf: 抽出対象のGeoDataFrame
-    return:
-        extract_fukuoka_gdf: 福岡市のみのデータを抽出したGeoDataFrame
-    """
-    mask = gdf.intersects(FUKUOKA_BBOX)
-    extract_fukuoka_gdf = gdf[mask]
-
-    return extract_fukuoka_gdf
-
-
 def export_shape_file(path):
     """
     引数で受け取ったshapeファイルを読み込む
@@ -92,7 +78,7 @@ def export_shape_file(path):
     gdf = None
     shapefile_path = Path(path)
     try:
-        gdf = gpd.read_file(shapefile_path, encoding="utf-8")
+        gdf = gpd.read_file(shapefile_path, bbox=FUKUOKA_BBOX, encoding="utf-8")
         print("Shapeファイルの読み込みに成功しました。")
 
     except DataSourceError as e:
@@ -115,7 +101,6 @@ def format_data_for_params(gdf):
     # 国土数値情報の鉄道のgeometryはLINESTRINGなのでPOINTに変換するために中心点を取得する
     # 変換前に一度メートル単位の座標系 (EPSG:6670) に変換し、重心を計算後、緯度経度 (EPSG:4326) に戻す
     centroids = gdf.to_crs(epsg=6670).geometry.centroid.to_crs(epsg=4326)
-    print(centroids[0])
     geometry_wkt = (f"POINT({point.y} {point.x})" for point in centroids)
 
     params_list = zip(gdf["N02_005"], gdf["N02_003"], geometry_wkt)
@@ -129,8 +114,7 @@ if __name__ == "__main__":
     if gdf_shp is None:
         print("[ERROR] 異常終了。")
         sys.exit(1)
-    fukuoka_gdf = extract_fukuoka_data(gdf_shp)
-    params, record_count = format_data_for_params(fukuoka_gdf)
+    params, record_count = format_data_for_params(gdf_shp)
 
     conn = None
     db_config = get_db_config_property()
