@@ -70,13 +70,12 @@ def execute_insert_query(cur, params, count):
     print(f"{count}件のデータを登録しました。")
 
 
-def execute_insert_query_supermarket(cur, params, count):
+def execute_insert_query_supermarket(cur, params):
     """
     引数で受け取ったsqlを実行する
     Args:
         cur: カーソル
         params: sqlに埋め込むパラメータ
-        count: パラメータの要素数
     """
     query = """
         INSERT INTO supermarkets (name, geom) VALUES %s;
@@ -87,7 +86,10 @@ def execute_insert_query_supermarket(cur, params, count):
         params,
         template="(%s, ST_GeomFromText(%s, 4326))",
     )
-    print(f"{count}件のデータを登録しました。")
+    # 挿入件数を取得するための
+    cur.execute("SELECT count(*) FROM supermarkets;")
+    total = cur.fetchone()[0]
+    print(f"{total}件のデータを登録しました。")
 
 
 def export_shape_file(path):
@@ -122,17 +124,15 @@ def load_geojson_file(path):
     """
     geojson_path = Path(path)
 
+    # yieldを使って書き直し
     with open(geojson_path, encoding="utf-8") as f:
         geojson = json.load(f)
         features = geojson["features"]
-        gen = (
-            (
-                features[i]["properties"].setdefault("name", "店名不明"),
-                f"POINT({features[i]['geometry']['coordinates'][0]} {features[i]['geometry']['coordinates'][1]})",
-            )
-            for i in range(len(features))
-        )
-        return gen
+
+        for feature in features:
+            name = feature["properties"].setdefault("name", "店名不明")
+            geom_wkt = f"POINT({feature['geometry']['coordinates'][0]} {feature['geometry']['coordinates'][1]})"
+            yield (name, geom_wkt)
 
 
 def format_data_for_params(gdf):
@@ -171,7 +171,7 @@ if __name__ == "__main__":
             print(f"DB: {db_config['database']} に接続しました。")
             with conn.cursor() as cur:
                 execute_truncate_query(cur, "supermarkets")
-                execute_insert_query_supermarket(cur, supermarket_list, 220)
+                execute_insert_query_supermarket(cur, supermarket_list)
                 execute_truncate_query(cur, "railway_stations")
                 execute_insert_query(cur, params, record_count)
 
