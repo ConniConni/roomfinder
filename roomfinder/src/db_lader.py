@@ -15,7 +15,7 @@ current_dir = Path(__file__).parent
 two_levels_up = current_dir.parent.parent
 shapefile_path = two_levels_up / "roomfinder/input_data/UTF-8/N02-22_Station.shp"
 
-FUKUOKA_BBOX = box(130.0158, 33.2530, 130.2942, 33.5200)
+FUKUOKA_BBOX = box(130.198072, 33.425124, 130.494834, 33.712839)
 
 
 def get_db_config_property():
