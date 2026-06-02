@@ -130,7 +130,7 @@ def load_geojson_file(path):
         features = geojson["features"]
 
         for feature in features:
-            name = feature["properties"].setdefault("name", "店名不明")
+            name = feature["properties"].get("name", "店名不明")
             geom_wkt = f"POINT({feature['geometry']['coordinates'][0]} {feature['geometry']['coordinates'][1]})"
             yield (name, geom_wkt)
 
