@@ -1,3 +1,4 @@
+import json
 import os
 import sys
 from pathlib import Path
@@ -14,6 +15,7 @@ from shapely import box
 current_dir = Path(__file__).parent
 two_levels_up = current_dir.parent.parent
 shapefile_path = two_levels_up / "roomfinder/input_data/UTF-8/N02-22_Station.shp"
+geojson_path = two_levels_up / "roomfinder/input_data/export.geojson"
 
 FUKUOKA_BBOX = box(130.198072, 33.425124, 130.494834, 33.712839)
 
@@ -68,6 +70,26 @@ def execute_insert_query(cur, params, count):
     print(f"{count}件のデータを登録しました。")
 
 
+def execute_insert_query_supermarket(cur, params, count):
+    """
+    引数で受け取ったsqlを実行する
+    Args:
+        cur: カーソル
+        params: sqlに埋め込むパラメータ
+        count: パラメータの要素数
+    """
+    query = """
+        INSERT INTO supermarkets (name, geom) VALUES %s;
+    """
+    execute_values(
+        cur,
+        query,
+        params,
+        template="(%s, ST_GeomFromText(%s, 4326))",
+    )
+    print(f"{count}件のデータを登録しました。")
+
+
 def export_shape_file(path):
     """
     引数で受け取ったshapeファイルを読み込む
@@ -87,6 +109,30 @@ def export_shape_file(path):
         print(f"予期せぬエラー: {e}")
 
     return gdf
+
+
+def export_geojson_file(path):
+    """
+    引数で受け取ったshapeファイルを読み込む
+    Args:
+        path: ファイルパス
+    return: データ挿入に使用するリスト geojson_supermarket
+    """
+    geojson_path = Path(path)
+
+    with open(geojson_path, encoding="utf-8") as f:
+        geojson = json.load(f)
+        features = geojson["features"]
+        gen = (
+            (
+                features[i]["properties"].setdefault("name", "店名不明"),
+                f"POINT({features[i]['geometry']['coordinates'][0]} {features[i]['geometry']['coordinates'][1]})",
+            )
+            for i in range(len(features))
+        )
+        # print(features[i]["properties"].setdefault("name", "店名不明"))
+        # print(features[i]["geometry"]["coordinates"])
+        return gen
 
 
 def format_data_for_params(gdf):
@@ -116,17 +162,17 @@ if __name__ == "__main__":
         sys.exit(1)
     params, record_count = format_data_for_params(gdf_shp)
 
+    supermarket_list = export_geojson_file(geojson_path)
+
     conn = None
     db_config = get_db_config_property()
     try:
         with db_connect(**db_config) as conn:
             print(f"DB: {db_config['database']} に接続しました。")
             with conn.cursor() as cur:
-
+                execute_truncate_query(cur, "supermarkets")
+                execute_insert_query_supermarket(cur, supermarket_list, 220)
                 execute_truncate_query(cur, "railway_stations")
-                # INSERT文組み立て
-                # for param in params:
-                #     execute_insert_query(cur, param)
                 execute_insert_query(cur, params, record_count)
 
     except psycopg2.OperationalError as e:
