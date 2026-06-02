@@ -45,7 +45,9 @@ def db_connect(**config):
 
 
 def execute_truncate_query(cur, table):
-    query = sql.SQL("TRUNCATE TABLE {} CASCADE;").format(sql.Identifier(table))
+    query = sql.SQL("TRUNCATE TABLE {} RESTART IDENTITY CASCADE;").format(
+        sql.Identifier(table)
+    )
     cur.execute(query)
     print(f"EXECUTE SQL: {cur.mogrify(query).decode('utf-8')}")
 
