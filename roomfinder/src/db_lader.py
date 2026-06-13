@@ -96,6 +96,26 @@ def execute_insert_query_supermarket(cur, params):
     print(f"{total}件のデータを登録しました。")
 
 
+def execute_insert_query_properties(cur, params):
+    """
+    Args:
+        cur: カーソル
+        params: sqlに埋め込むパラメータ
+    """
+    query = """
+        INSERT INTO properties (name, rent, geom) VALUES %s;
+    """
+    execute_values(
+        cur,
+        query,
+        params,
+        template="(%s, %s, ST_GeomFromText(%s, 4326))",
+    )
+    cur.execute("SELECT COUNT(*) FROM properties;")
+    total = cur.fetchone()[0]
+    print(f"{total}件のデータを登録しました。")
+
+
 def export_shape_file(path):
     """
     引数で受け取ったshapeファイルを読み込む
@@ -198,6 +218,8 @@ if __name__ == "__main__":
                 execute_insert_query_supermarket(cur, supermarket_list)
                 execute_truncate_query(cur, "railway_stations")
                 execute_insert_query(cur, params, record_count)
+                execute_truncate_query(cur, "properties")
+                execute_insert_query_properties(cur, property_list)
 
     except psycopg2.OperationalError as e:
         print(f"データベース接続エラー: {e}")
