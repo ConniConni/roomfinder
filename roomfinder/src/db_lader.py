@@ -1,3 +1,4 @@
+import csv
 import json
 import os
 import sys
@@ -11,11 +12,12 @@ from psycopg2.extras import execute_values
 from dotenv import load_dotenv
 from shapely import box
 
-# 読み込み対象のファイルパスを取得
+# 読み込み対象のファイルパasスを取得
 current_dir = Path(__file__).parent
 two_levels_up = current_dir.parent.parent
 shapefile_path = two_levels_up / "roomfinder/input_data/UTF-8/N02-22_Station.shp"
 geojson_path = two_levels_up / "roomfinder/input_data/export.geojson"
+csv_file = two_levels_up / "roomfinder/input_data/properties_sample.csv"
 
 FUKUOKA_BBOX = box(130.198072, 33.425124, 130.494834, 33.712839)
 
@@ -138,6 +140,24 @@ def load_geojson_file(path):
             yield (name, geom_wkt)
 
 
+def load_csv_file(path):
+    """
+    引数で受け取ったCSVファイルを読み込む
+    Args:
+        path: ファイルパス
+    return:
+        property_list: データ挿入に使用する建物リスト
+    """
+    property_list = []
+
+    with open(path, mode="r", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            item = (row["name"], int(row["rent"]), row["geom"])
+            property_list.append(item)
+    return property_list
+
+
 def format_data_for_params(gdf):
     """
     受け取ったgdfのデータをクエリのパラメータに使える形に変換する
@@ -166,6 +186,7 @@ if __name__ == "__main__":
     params, record_count = format_data_for_params(gdf_shp)
 
     supermarket_list = load_geojson_file(geojson_path)
+    property_list = load_csv_file(csv_file)
 
     conn = None
     db_config = get_db_config_property()
