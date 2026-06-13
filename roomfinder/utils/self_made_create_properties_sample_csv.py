@@ -26,9 +26,7 @@ import pandas as pd
 from pathlib import Path
 
 current_dir = Path(__file__).parent
-print(f"デバック: {current_dir}")
 two_levels_up = current_dir.parent.parent
-print(f"デバック: {two_levels_up}")
 csv_file_path = two_levels_up / "roomfinder/input_data/properties_sample.csv"
 record_num = 100
 
