@@ -23,8 +23,13 @@ suffixes = ["天神", "博多", "大濠", "西新", "赤坂", "薬院", "千早"
 
 import random
 import pandas as pd
+from pathlib import Path
 
-csv_file_name = "properties_sample.csv"
+current_dir = Path(__file__).parent
+print(f"デバック: {current_dir}")
+two_levels_up = current_dir.parent.parent
+print(f"デバック: {two_levels_up}")
+csv_file_path = two_levels_up / "roomfinder/input_data/properties_sample.csv"
 record_num = 100
 
 
@@ -67,5 +72,5 @@ def generate_fukuoka_spatial_data(num_sample=100):
 
 df = generate_fukuoka_spatial_data(record_num)
 print(df.head())
-df.to_csv(csv_file_name, index=False, encoding="utf-8")
+df.to_csv(csv_file_path, index=False, encoding="utf-8")
 print(f"{record_num}件のデータをもつcsvを出力しました。")
