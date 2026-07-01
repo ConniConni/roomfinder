@@ -85,6 +85,8 @@ try:
         # with句を抜けたら自動でカーソルを閉じる
         with conn.cursor() as cur:
             cur.execute(sql, {"point_wkt": parse})
+            log_msg_sql = cur.mogrify(sql, {"point_wkt": parse}).decode("utf-8")
+            logger.debug(log_msg_sql)
             rows = cur.fetchall()
             total_rows = len(rows)
 
@@ -97,13 +99,13 @@ try:
             write.writerow(header)
             # 取得したidとgeomを書き込み
             write.writerows(rows)
-            print(f"{total_rows}件 のデータをファイルに書き込みました。")
+            logger.info(f"{total_rows}件 のデータをファイルに書き込みました。")
 
 
 except psycopg2.Error as e:
-    print(f"DBエラーが発生しました。:{e}")
+    logger.error(f"DBエラーが発生しました。:{e}")
 
 finally:
     if conn:
         conn.close()
-    print("DB切断")
+    logger.info("DB切断")
