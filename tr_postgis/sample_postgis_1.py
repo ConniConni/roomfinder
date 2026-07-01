@@ -66,7 +66,7 @@ try:
 
         header = ["id", "geom"]
 
-        with open("extraction_point.csv", mode="w", encoding="utf-8") as f:
+        with open("extraction_point.csv", mode="w", encoding="utf-8", newline="") as f:
             write = csv.writer(f)
 
             # ヘッダー書き込み
