@@ -42,7 +42,8 @@ sql = """
         geom::geography,
         ST_GeogFromText(%(point_wkt)s),
         1000
-    );
+    )
+    ORDER BY id;
 """
 
 # SQL実行の際に渡す引数
@@ -61,6 +62,7 @@ try:
         with conn.cursor() as cur:
             cur.execute(sql, {"point_wkt": parse})
             rows = cur.fetchall()
+            total_rows = len(rows)
 
         header = ["id", "geom"]
 
@@ -71,6 +73,7 @@ try:
             write.writerow(header)
             # 取得したidとgeomを書き込み
             write.writerows(rows)
+            print(f"{total_rows}件 のデータをファイルに書き込みました。")
 
 
 except psycopg2.Error as e:
