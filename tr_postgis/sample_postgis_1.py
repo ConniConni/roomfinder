@@ -9,12 +9,35 @@
 # curからforループで取り出し、csvモジュールのwrite()メソッドを使用
 
 import csv
+import logging
+import logging
 import os
 import psycopg2
 from dotenv import load_dotenv
 
 # 基準点:東京タワー
 TARGET_POINT = (35.658, 139.745)
+
+# ログレベルをDEBUGに設定
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+
+# コンソールハンドラ
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.INFO)
+
+# ファイルハンドラ
+file_handler = logging.FileHandler("debug.log")
+file_handler.setLevel(logging.DEBUG)
+
+# フォーマッタ
+formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+console_handler.setFormatter(formatter)
+file_handler.setFormatter(formatter)
+
+# loggerにハンドラを追加する
+logger.addHandler(console_handler)
+logger.addHandler(file_handler)
 
 # .envファイル読み込み接続情報を取得
 load_dotenv()
@@ -57,7 +80,8 @@ try:
     # 正常終了時は自動でcommit
     # エラー発生時は自動でrollback（その後except句の処理）
     with psycopg2.connect(**db_config) as conn:
-        print("DB接続")
+        # print("DB接続")
+        logger.info("DB接続")
         # with句を抜けたら自動でカーソルを閉じる
         with conn.cursor() as cur:
             cur.execute(sql, {"point_wkt": parse})
