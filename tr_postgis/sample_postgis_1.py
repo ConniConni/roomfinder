@@ -8,6 +8,7 @@
 # ファイル書き込み(extraction_point.csv)
 # curからforループで取り出し、csvモジュールのwrite()メソッドを使用
 
+import csv
 import os
 import psycopg2
 from dotenv import load_dotenv
@@ -34,8 +35,7 @@ db_config = {
 
 # 実行するSQL
 sql = """
-    -- SELECT id, ST_AsText(geom)
-    SELECT COUNT(*)
+    SELECT id, ST_AsText(geom) AS geom
     FROM training_data
     WHERE geom && ST_Expand(ST_GeomFromText(%(point_wkt)s, 4326), 0.015)
     AND ST_DWithin(
@@ -60,8 +60,18 @@ try:
         # with句を抜けたら自動でカーソルを閉じる
         with conn.cursor() as cur:
             cur.execute(sql, {"point_wkt": parse})
-            result = cur.fetchone()
-            print(f"{result[0]}行取得しました。")
+            rows = cur.fetchall()
+
+        header = ["id", "geom"]
+
+        with open("extraction_point.csv", mode="w", encoding="utf-8") as f:
+            write = csv.writer(f)
+
+            # ヘッダー書き込み
+            write.writerow(header)
+            # 取得したidとgeomを書き込み
+            write.writerows(rows)
+
 
 except psycopg2.Error as e:
     print(f"DBエラーが発生しました。:{e}")
