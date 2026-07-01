@@ -27,20 +27,22 @@ db_config = {
     "password": password,
 }
 
-conn = psycopg2.connect(**db_config)
-
-cur = None
+# finally句で明示的に接続を閉じるために定義
+conn = None
 
 try:
-    cur = conn.cursor()
-    print("DB接続")
+    # 正常終了時は自動でcommit
+    # エラー発生時は自動でrollback（その後except句の処理）
+    with psycopg2.connect(**db_config) as conn:
+        print("DB接続")
+        # with句を抜けたら自動でカーソルを閉じる
+        with conn.cursor() as cur:
+            pass
 
-except:
-    pass
+except psycopg2.Error as e:
+    print(f"DBエラーが発生しました。:{e}")
 
 finally:
-    if cur is not None:
-        cur.close()
-    if conn is not None:
+    if conn:
         conn.close()
     print("DB切断")
