@@ -15,6 +15,7 @@ from dotenv import load_dotenv
 # 基準点:東京タワー
 TARGET_POINT = (35.658, 139.745)
 
+# .envファイル読み込み接続情報を取得
 load_dotenv()
 
 dbname = os.getenv("POSTGRES_DB")
@@ -22,6 +23,7 @@ user = os.getenv("POSTGRES_USER")
 password = os.getenv("POSTGRES_PASSWORD")
 port = os.getenv("POSTGRES_PORT")
 
+# psycopg2の接続処理に使用する引数の形にまとめる
 db_config = {
     "host": "localhost",
     "port": port,
@@ -30,9 +32,7 @@ db_config = {
     "password": password,
 }
 
-parse = f"POINT({TARGET_POINT[1]} {TARGET_POINT[0]})"
-
-
+# 実行するSQL
 sql = """
     -- SELECT id, ST_AsText(geom)
     SELECT COUNT(*)
@@ -44,6 +44,10 @@ sql = """
         1000
     );
 """
+
+# SQL実行の際に渡す引数
+parse = f"POINT({TARGET_POINT[1]} {TARGET_POINT[0]})"
+
 
 # finally句で明示的に接続を閉じるために定義
 conn = None
