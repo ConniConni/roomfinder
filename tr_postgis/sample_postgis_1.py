@@ -12,6 +12,9 @@ import os
 import psycopg2
 from dotenv import load_dotenv
 
+# 基準点:東京タワー
+TARGET_POINT = (35.658, 139.745)
+
 load_dotenv()
 
 dbname = os.getenv("POSTGRES_DB")
@@ -27,6 +30,21 @@ db_config = {
     "password": password,
 }
 
+parse = f"POINT({TARGET_POINT[1]} {TARGET_POINT[0]})"
+
+
+sql = """
+    -- SELECT id, ST_AsText(geom)
+    SELECT COUNT(*)
+    FROM training_data
+    WHERE geom && ST_Expand(ST_GeomFromText(%(point_wkt)s, 4326), 0.015)
+    AND ST_DWithin(
+        geom::geography,
+        ST_GeogFromText(%(point_wkt)s),
+        1000
+    );
+"""
+
 # finally句で明示的に接続を閉じるために定義
 conn = None
 
@@ -37,7 +55,9 @@ try:
         print("DB接続")
         # with句を抜けたら自動でカーソルを閉じる
         with conn.cursor() as cur:
-            pass
+            cur.execute(sql, {"point_wkt": parse})
+            result = cur.fetchone()
+            print(f"{result[0]}行取得しました。")
 
 except psycopg2.Error as e:
     print(f"DBエラーが発生しました。:{e}")
