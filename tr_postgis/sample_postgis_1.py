@@ -10,7 +10,6 @@
 
 import csv
 import logging
-import logging
 import os
 import psycopg2
 from dotenv import load_dotenv
