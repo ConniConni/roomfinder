@@ -19,7 +19,7 @@ def get_db_config():
         "password": os.getenv("POSTGRES_PASSWORD"),
     }
     missing_keys = []
-    for key, value in db_config:
+    for key, value in db_config.items():
         if not value:
             missing_keys.append(key)
 
