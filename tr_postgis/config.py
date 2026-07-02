@@ -5,22 +5,31 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 # このファイルの場所を取得
-current_dir = Path(__file__)
+# current_dir = Path(__file__)
 
-# .env(２階層上)を読み込むために該当のディレクトリを取得
-project_root = current_dir.parent.parent
-print(f"project_root: {project_root}")
+# # .env(２階層上)を読み込むために該当のディレクトリを取得
+# project_root = current_dir.parent.parent
+# print(f"project_root: {project_root}")
 
-# .envの絶対パスを作成
-env_path = project_root / ".env"
-print(f"env_path: {env_path}")
+# # .envの絶対パスを作成
+# env_path = project_root / ".env"
+# print(f"env_path: {env_path}")
+print(f"1. Pythonが思っている現在の場所: {os.getcwd()}")
+print("--- OSのメモリを確認します ---")
+print(f"POSTGRES_DB: {os.getenv('POSTGRES_DB')}")
+print(f"POSTGRES_USER: {os.getenv('POSTGRES_USER')}")
 
 
 def get_db_config():
     logger = logging.getLogger(__name__)
 
     # .envファイル読み込み接続情報を取得
-    load_dotenv(env_path)
+    # load_dotenv(env_path)
+    load_dotenv()
+
+    print("--- OSのメモリを確認します ---")
+    print(f"POSTGRES_DB: {os.getenv('POSTGRES_DB')}")
+    print(f"POSTGRES_USER: {os.getenv('POSTGRES_USER')}")
 
     # .envから値を取得し、psycopg2の接続処理に使用する引数の形にまとめる
     db_config = {
