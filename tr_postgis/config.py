@@ -1,22 +1,26 @@
 import logging
 
-# 子ロガーを作成
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
 
-# コンソールハンドラを作成: ログレベルはINFO
-console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.INFO)
+def setup_logging(log_file="debug.log", level=logging.DEBUG):
+    # ルートロガーを取得
+    root_logger = logging.getLogger()
+    root_logger.setLevel(level)
 
-# ファイルハンドラを作成: ログレベルはDEBUG
-file_handler = logging.FileHandler("debug.log")
-file_handler.setLevel(logging.DEBUG)
+    # コンソールハンドラを作成: ログレベルはINFO
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.INFO)
 
-# フォーマッタを作成
-formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(lineno)s - %(message)s")
-console_handler.setFormatter(formatter)
-file_handler.setFormatter(formatter)
+    # ファイルハンドラを作成: ログレベルはDEBUG
+    file_handler = logging.FileHandler(log_file)
+    file_handler.setLevel(logging.DEBUG)
 
-# ハンドラにフォーマッタを追加
-logger.addHandler(console_handler)
-logger.addHandler(file_handler)
+    # フォーマッタを作成
+    formatter = logging.Formatter(
+        "%(asctime)s - %(levelname)s - %(lineno)s - %(message)s"
+    )
+    console_handler.setFormatter(formatter)
+    file_handler.setFormatter(formatter)
+
+    # ハンドラにフォーマッタを追加
+    root_logger.addHandler(console_handler)
+    root_logger.addHandler(file_handler)
