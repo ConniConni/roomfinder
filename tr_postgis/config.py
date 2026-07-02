@@ -1,14 +1,26 @@
 import logging
 import os
 import sys
+from pathlib import Path
 from dotenv import load_dotenv
+
+# このファイルの場所を取得
+current_dir = Path(__file__)
+
+# .env(２階層上)を読み込むために該当のディレクトリを取得
+project_root = current_dir.parent.parent
+print(f"project_root: {project_root}")
+
+# .envの絶対パスを作成
+env_path = project_root / ".env"
+print(f"env_path: {env_path}")
 
 
 def get_db_config():
     logger = logging.getLogger(__name__)
 
     # .envファイル読み込み接続情報を取得
-    load_dotenv()
+    load_dotenv(env_path)
 
     # .envから値を取得し、psycopg2の接続処理に使用する引数の形にまとめる
     db_config = {
