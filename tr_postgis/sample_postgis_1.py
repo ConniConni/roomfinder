@@ -14,29 +14,17 @@ import os
 import psycopg2
 from dotenv import load_dotenv
 
+import config
+
 # 基準点:東京タワー
 TARGET_POINT = (35.658, 139.745)
+LOG_FILE = "debug.log"
+LOG_LEVEL = logging.DEBUG
 
-# ログレベルをDEBUGに設定
+# ロギング設定
+config.setup_logging(LOG_FILE, LOG_LEVEL)
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
 
-# コンソールハンドラ
-console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.INFO)
-
-# ファイルハンドラ
-file_handler = logging.FileHandler("debug.log")
-file_handler.setLevel(logging.DEBUG)
-
-# フォーマッタ
-formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
-console_handler.setFormatter(formatter)
-file_handler.setFormatter(formatter)
-
-# loggerにハンドラを追加する
-logger.addHandler(console_handler)
-logger.addHandler(file_handler)
 
 # .envファイル読み込み接続情報を取得
 load_dotenv()
