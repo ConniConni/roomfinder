@@ -10,9 +10,7 @@
 
 import csv
 import logging
-import os
 import psycopg2
-from dotenv import load_dotenv
 
 import config
 
@@ -25,23 +23,8 @@ LOG_LEVEL = logging.DEBUG
 config.setup_logging(LOG_FILE, LOG_LEVEL)
 logger = logging.getLogger(__name__)
 
-
-# .envファイル読み込み接続情報を取得
-load_dotenv()
-
-dbname = os.getenv("POSTGRES_DB")
-user = os.getenv("POSTGRES_USER")
-password = os.getenv("POSTGRES_PASSWORD")
-port = os.getenv("POSTGRES_PORT")
-
-# psycopg2の接続処理に使用する引数の形にまとめる
-db_config = {
-    "host": "localhost",
-    "port": port,
-    "database": dbname,
-    "user": user,
-    "password": password,
-}
+# DB接続情報を取得
+db_config = config.get_db_config()
 
 # 実行するSQL
 sql = """
