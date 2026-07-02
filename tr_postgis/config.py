@@ -13,7 +13,7 @@ file_handler = logging.FileHandler("debug.log")
 file_handler.setLevel(logging.DEBUG)
 
 # フォーマッタを作成
-formatter = logging.Formatter("%(asctime)s : %(levelname)s : %(message)s")
+formatter = logging.Formatter("%(asctime)s : %(levelname)s : %(lineno)s : %(message)s")
 console_handler.setFormatter(formatter)
 file_handler.setFormatter(formatter)
 
