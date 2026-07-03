@@ -27,6 +27,16 @@ logger = logging.getLogger(__name__)
 
 # --- 関数定義 ---
 def fetch_data_from_db(db_config, params):
+    """
+    DBに接続し、クエリを実行してデータを取得する
+
+    args:
+        db_config (dict): DB接続情報
+        params (tuple): SQLのパラメータ
+
+    return:
+        rows (list): クエリの実行結果
+    """
 
     # finally句で明示的に接続を閉じるために定義
     conn = None
@@ -73,6 +83,13 @@ def fetch_data_from_db(db_config, params):
 
 
 def save_to_csv(file_name, rows):
+    """
+    CSVファイルにリストのデータを書き込む
+
+    args:
+        file_name (string): ファイル名
+        rows (list): 書き込み対象のリスト
+    """
 
     if not rows:
         logger.info("取得結果が0件のためCSVファイルの出力をスキップ")
