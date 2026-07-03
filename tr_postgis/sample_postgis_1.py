@@ -14,15 +14,17 @@ import psycopg2
 
 import config
 
+# --- 定数 ---
 # 基準点:東京タワー
 TARGET_POINT = (35.658, 139.745)
 CSV_FILE_NAME = "extraction_point.csv"
 
-# ロギング設定
+# --- ロギング設定 ---
 config.setup_logging()
 logger = logging.getLogger(__name__)
 
 
+# --- 関数定義 ---
 def fetch_data_from_db(db_config, params):
 
     # finally句で明示的に接続を閉じるために定義
@@ -87,6 +89,7 @@ def save_to_csv(file_name, rows):
         logger.info(f"{len(rows)}件 のデータをファイルに書き込みました。")
 
 
+# --- メイン処理 ---
 def main():
     # DB接続情報を取得
     db_config = config.get_db_config()
