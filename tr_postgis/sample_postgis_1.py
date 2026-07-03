@@ -76,7 +76,7 @@ def fetch_data_from_db(db_config, sql, parse):
 
 
 def save_to_csv(file_name, rows):
-    total_rows = len(rows)
+
     header = ["id", "geom"]
 
     with open(file_name, mode="w", encoding="utf-8", newline="") as f:
@@ -86,7 +86,7 @@ def save_to_csv(file_name, rows):
         write.writerow(header)
         # 取得したidとgeomを書き込み
         write.writerows(rows)
-        logger.info(f"{total_rows}件 のデータをファイルに書き込みました。")
+        logger.info(f"{len(rows)}件 のデータをファイルに書き込みました。")
 
 
 def main():
