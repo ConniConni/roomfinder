@@ -70,7 +70,7 @@ def fetch_data_from_db(db_config, sql, parse):
     finally:
         if conn:
             conn.close()
-        logger.info("DB切断")
+            logger.info("DB切断")
 
     return rows
 
