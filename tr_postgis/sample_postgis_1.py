@@ -77,6 +77,10 @@ def fetch_data_from_db(db_config, sql, parse):
 
 def save_to_csv(file_name, rows):
 
+    if not rows:
+        logger.info("取得結果が0件のためCSVファイルの出力をスキップ")
+        return
+
     header = ["id", "geom"]
 
     with open(file_name, mode="w", encoding="utf-8", newline="") as f:
