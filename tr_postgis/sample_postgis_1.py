@@ -26,9 +26,28 @@ logger = logging.getLogger(__name__)
 
 
 # --- 関数定義 ---
+def connect_db(db_config):
+    """
+    DBへの接続を確立する
+
+    args:
+        db_config (dict): DB接続情報
+
+    return:
+        conn (object): 接続オブジェクト
+    """
+
+    conn = None  # 初期化
+    conn = psycopg2.connect(**db_config)
+
+    if conn:
+        logger.info("DB接続")
+    return conn
+
+
 def fetch_data_from_db(db_config, param):
     """
-    DBに接続し、クエリを実行してデータを取得する
+    クエリを実行してデータを取得する
 
     args:
         db_config (dict): DB接続情報
@@ -59,13 +78,11 @@ def fetch_data_from_db(db_config, param):
     try:
         # 正常終了時は自動でcommit
         # エラー発生時は自動でrollback（その後except句の処理）
-        with psycopg2.connect(**db_config) as conn:
-            # print("DB接続")
-            logger.info("DB接続")
+        with connect_db(db_config) as conn:
             # with句を抜けたら自動でカーソルを閉じる
             with conn.cursor() as cur:
                 cur.execute(sql, {"point_wkt": param})
-                log_msg_sql = cur.mogrify(sql, {"point_wkt": params}).decode("utf-8")
+                log_msg_sql = cur.mogrify(sql, {"point_wkt": param}).decode("utf-8")
                 logger.debug(log_msg_sql)
                 rows = cur.fetchall()
                 # rowsを返すので行数取得は別処理へ移行
@@ -116,7 +133,7 @@ def main():
     point_wkt = f"POINT({TARGET_POINT[1]} {TARGET_POINT[0]})"
 
     # データ取得
-    fetch_rows = fetch_data_from_db(db_config, (point_wkt,))
+    fetch_rows = fetch_data_from_db(db_config, point_wkt)
     # 取得したデータをCSVに出力
     save_to_csv(CSV_FILE_NAME, fetch_rows)
 
