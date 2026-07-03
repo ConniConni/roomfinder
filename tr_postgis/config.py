@@ -1,8 +1,8 @@
 import logging
 import os
 import sys
+from datetime import datetime
 from pathlib import Path
-from tkinter import CURRENT
 from dotenv import load_dotenv
 
 # .env(２階層上)を読み込むために該当のディレクトリを取得
@@ -44,7 +44,12 @@ def get_db_config():
     return db_config
 
 
-def setup_logging(log_file=LOG_DIR / "debug.log", level=LOG_LEVEL):
+def setup_logging(level=LOG_LEVEL):
+
+    # 現在時刻を取得
+    now_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+    log_file = LOG_DIR / f"debug_{now_str}.log"
+
     # ルートロガーを取得
     root_logger = logging.getLogger()
     root_logger.setLevel(level)
