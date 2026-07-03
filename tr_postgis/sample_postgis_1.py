@@ -16,11 +16,9 @@ import config
 
 # 基準点:東京タワー
 TARGET_POINT = (35.658, 139.745)
-LOG_FILE = "debug.log"
-LOG_LEVEL = logging.DEBUG
 
 # ロギング設定
-config.setup_logging(LOG_FILE, LOG_LEVEL)
+config.setup_logging()
 logger = logging.getLogger(__name__)
 
 # DB接続情報を取得

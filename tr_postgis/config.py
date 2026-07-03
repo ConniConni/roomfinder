@@ -2,13 +2,19 @@ import logging
 import os
 import sys
 from pathlib import Path
+from tkinter import CURRENT
 from dotenv import load_dotenv
 
 # .env(２階層上)を読み込むために該当のディレクトリを取得
-PROJECT_ROOT_DIR = Path(__file__).parent.parent
-
+CURRENT_DIR = Path(__file__)
+PROJECT_ROOT_DIR = CURRENT_DIR.parent.parent
 # .envの絶対パスを作成
 ENV_PATH = PROJECT_ROOT_DIR / ".env"
+# ログフォルダの絶対パスを作成
+LOG_DIR = CURRENT_DIR.parent / "log"
+
+# ログレベルを設定
+LOG_LEVEL = logging.DEBUG
 
 
 def get_db_config():
@@ -38,7 +44,7 @@ def get_db_config():
     return db_config
 
 
-def setup_logging(log_file="debug.log", level=logging.DEBUG):
+def setup_logging(log_file=LOG_DIR / "debug.log", level=LOG_LEVEL):
     # ルートロガーを取得
     root_logger = logging.getLogger()
     root_logger.setLevel(level)
