@@ -16,6 +16,7 @@ import config
 
 # 基準点:東京タワー
 TARGET_POINT = (35.658, 139.745)
+CSV_FILE_NAME = "extraction_point.csv"
 
 # ロギング設定
 config.setup_logging()
@@ -74,11 +75,11 @@ def fetch_data_from_db(db_config, sql, parse):
     return rows
 
 
-def save_to_csv(rows):
+def save_to_csv(file_name, rows):
     total_rows = len(rows)
     header = ["id", "geom"]
 
-    with open("extraction_point.csv", mode="w", encoding="utf-8", newline="") as f:
+    with open(file_name, mode="w", encoding="utf-8", newline="") as f:
         write = csv.writer(f)
 
         # ヘッダー書き込み
@@ -90,7 +91,7 @@ def save_to_csv(rows):
 
 def main():
     fetch_rows = fetch_data_from_db(db_config, sql, parse)
-    save_to_csv(fetch_rows)
+    save_to_csv(CSV_FILE_NAME, fetch_rows)
 
 
 if __name__ == "__main__":
