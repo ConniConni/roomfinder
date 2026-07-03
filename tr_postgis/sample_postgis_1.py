@@ -26,13 +26,13 @@ logger = logging.getLogger(__name__)
 
 
 # --- 関数定義 ---
-def fetch_data_from_db(db_config, params):
+def fetch_data_from_db(db_config, param):
     """
     DBに接続し、クエリを実行してデータを取得する
 
     args:
         db_config (dict): DB接続情報
-        params (tuple): SQLのパラメータ
+        params (string): SQLのパラメータ
 
     return:
         rows (list): クエリの実行結果
@@ -64,7 +64,7 @@ def fetch_data_from_db(db_config, params):
             logger.info("DB接続")
             # with句を抜けたら自動でカーソルを閉じる
             with conn.cursor() as cur:
-                cur.execute(sql, {"point_wkt": params})
+                cur.execute(sql, {"point_wkt": param})
                 log_msg_sql = cur.mogrify(sql, {"point_wkt": params}).decode("utf-8")
                 logger.debug(log_msg_sql)
                 rows = cur.fetchall()
