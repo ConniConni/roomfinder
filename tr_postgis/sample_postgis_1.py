@@ -41,49 +41,54 @@ sql = """
 parse = f"POINT({TARGET_POINT[1]} {TARGET_POINT[0]})"
 
 
-# finally句で明示的に接続を閉じるために定義
-conn = None
+def fetch_data_from_db():
 
-try:
-    # 正常終了時は自動でcommit
-    # エラー発生時は自動でrollback（その後except句の処理）
-    with psycopg2.connect(**db_config) as conn:
-        # print("DB接続")
-        logger.info("DB接続")
-        # with句を抜けたら自動でカーソルを閉じる
-        with conn.cursor() as cur:
-            cur.execute(sql, {"point_wkt": parse})
-            log_msg_sql = cur.mogrify(sql, {"point_wkt": parse}).decode("utf-8")
-            logger.debug(log_msg_sql)
-            rows = cur.fetchall()
-            # rowsを返すので行数取得はmain()へ移行
-            # total_rows = len(rows)
+    # finally句で明示的に接続を閉じるために定義
+    conn = None
 
-        header = ["id", "geom"]
+    try:
+        # 正常終了時は自動でcommit
+        # エラー発生時は自動でrollback（その後except句の処理）
+        with psycopg2.connect(**db_config) as conn:
+            # print("DB接続")
+            logger.info("DB接続")
+            # with句を抜けたら自動でカーソルを閉じる
+            with conn.cursor() as cur:
+                cur.execute(sql, {"point_wkt": parse})
+                log_msg_sql = cur.mogrify(sql, {"point_wkt": parse}).decode("utf-8")
+                logger.debug(log_msg_sql)
+                rows = cur.fetchall()
+                # rowsを返すので行数取得は別処理へ移行
+                # total_rows = len(rows)
 
-        with open("extraction_point.csv", mode="w", encoding="utf-8", newline="") as f:
-            write = csv.writer(f)
+    except psycopg2.Error as e:
+        logger.error(f"DBエラーが発生しました。:{e}")
 
-            # ヘッダー書き込み
-            write.writerow(header)
-            # 取得したidとgeomを書き込み
-            write.writerows(rows)
-            logger.info(f"{total_rows}件 のデータをファイルに書き込みました。")
+    finally:
+        if conn:
+            conn.close()
+        logger.info("DB切断")
+
+    return rows
 
 
-except psycopg2.Error as e:
-    logger.error(f"DBエラーが発生しました。:{e}")
+def save_to_csv(rows):
+    total_rows = len(rows)
+    header = ["id", "geom"]
 
-finally:
-    if conn:
-        conn.close()
-    logger.info("DB切断")
+    with open("extraction_point.csv", mode="w", encoding="utf-8", newline="") as f:
+        write = csv.writer(f)
+
+        # ヘッダー書き込み
+        write.writerow(header)
+        # 取得したidとgeomを書き込み
+        write.writerows(rows)
+        logger.info(f"{total_rows}件 のデータをファイルに書き込みました。")
 
 
 def main():
     fetch_rows = fetch_data_from_db()
-    total_fetch_rows = len(rows)
-    save_to_csv(rows, total_fetch_rows)
+    save_to_csv(fetch_rows)
 
 
 if __name__ == "__main__":
