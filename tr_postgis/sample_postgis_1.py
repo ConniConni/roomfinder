@@ -45,6 +45,8 @@ def fetch_data_from_db(db_config, sql, parse):
 
     # finally句で明示的に接続を閉じるために定義
     conn = None
+    # 取得したデータの保存先を定義
+    rows = []
 
     try:
         # 正常終了時は自動でcommit
