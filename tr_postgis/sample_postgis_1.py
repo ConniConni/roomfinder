@@ -19,6 +19,7 @@ import config
 TARGET_POINT = (35.658, 139.745)
 CSV_FILE_NAME = "extraction_point.csv"
 
+
 # --- ロギング設定 ---
 config.setup_logging()
 logger = logging.getLogger(__name__)
@@ -53,7 +54,7 @@ def fetch_data_from_db(db_config, params):
             logger.info("DB接続")
             # with句を抜けたら自動でカーソルを閉じる
             with conn.cursor() as cur:
-                cur.execute(sql, {"point_wkt": point_wkt})
+                cur.execute(sql, {"point_wkt": params})
                 log_msg_sql = cur.mogrify(sql, {"point_wkt": params}).decode("utf-8")
                 logger.debug(log_msg_sql)
                 rows = cur.fetchall()
@@ -98,7 +99,7 @@ def main():
     point_wkt = f"POINT({TARGET_POINT[1]} {TARGET_POINT[0]})"
 
     # データ取得
-    fetch_rows = fetch_data_from_db(db_config, point_wkt)
+    fetch_rows = fetch_data_from_db(db_config, (point_wkt,))
     # 取得したデータをCSVに出力
     save_to_csv(CSV_FILE_NAME, fetch_rows)
 
