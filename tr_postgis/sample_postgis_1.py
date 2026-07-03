@@ -77,3 +77,11 @@ finally:
     if conn:
         conn.close()
     logger.info("DB切断")
+
+
+def main():
+    print("main関数を呼び出しました")
+
+
+if __name__ == "__main__":
+    main()
