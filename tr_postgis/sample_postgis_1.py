@@ -56,7 +56,8 @@ try:
             log_msg_sql = cur.mogrify(sql, {"point_wkt": parse}).decode("utf-8")
             logger.debug(log_msg_sql)
             rows = cur.fetchall()
-            total_rows = len(rows)
+            # rowsを返すので行数取得はmain()へ移行
+            # total_rows = len(rows)
 
         header = ["id", "geom"]
 
@@ -80,7 +81,9 @@ finally:
 
 
 def main():
-    print("main関数を呼び出しました")
+    fetch_rows = fetch_data_from_db()
+    total_fetch_rows = len(rows)
+    save_to_csv(rows, total_fetch_rows)
 
 
 if __name__ == "__main__":
