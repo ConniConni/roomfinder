@@ -39,7 +39,7 @@ sql = """
 """
 
 # SQL実行の際に渡す引数
-parse = f"POINT({TARGET_POINT[1]} {TARGET_POINT[0]})"
+point_wkt = f"POINT({TARGET_POINT[1]} {TARGET_POINT[0]})"
 
 
 def fetch_data_from_db(db_config, sql, parse):
@@ -57,7 +57,7 @@ def fetch_data_from_db(db_config, sql, parse):
             logger.info("DB接続")
             # with句を抜けたら自動でカーソルを閉じる
             with conn.cursor() as cur:
-                cur.execute(sql, {"point_wkt": parse})
+                cur.execute(sql, {"point_wkt": point_wkt})
                 log_msg_sql = cur.mogrify(sql, {"point_wkt": parse}).decode("utf-8")
                 logger.debug(log_msg_sql)
                 rows = cur.fetchall()
@@ -94,7 +94,7 @@ def save_to_csv(file_name, rows):
 
 
 def main():
-    fetch_rows = fetch_data_from_db(db_config, sql, parse)
+    fetch_rows = fetch_data_from_db(db_config, sql, point_wkt)
     save_to_csv(CSV_FILE_NAME, fetch_rows)
 
 
