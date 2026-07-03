@@ -22,32 +22,26 @@ CSV_FILE_NAME = "extraction_point.csv"
 config.setup_logging()
 logger = logging.getLogger(__name__)
 
-# DB接続情報を取得
-db_config = config.get_db_config()
 
-# 実行するSQL
-sql = """
-    SELECT id, ST_AsText(geom) AS geom
-    FROM training_data
-    WHERE geom && ST_Expand(ST_GeomFromText(%(point_wkt)s, 4326), 0.015)
-    AND ST_DWithin(
-        geom::geography,
-        ST_GeogFromText(%(point_wkt)s),
-        1000
-    )
-    ORDER BY id;
-"""
-
-# SQL実行の際に渡す引数
-point_wkt = f"POINT({TARGET_POINT[1]} {TARGET_POINT[0]})"
-
-
-def fetch_data_from_db(db_config, sql, parse):
+def fetch_data_from_db(db_config, params):
 
     # finally句で明示的に接続を閉じるために定義
     conn = None
     # 取得したデータの保存先を定義
     rows = []
+
+    # 実行するSQL
+    sql = """
+        SELECT id, ST_AsText(geom) AS geom
+        FROM training_data
+        WHERE geom && ST_Expand(ST_GeomFromText(%(point_wkt)s, 4326), 0.015)
+        AND ST_DWithin(
+            geom::geography,
+            ST_GeogFromText(%(point_wkt)s),
+            1000
+        )
+        ORDER BY id;
+    """
 
     try:
         # 正常終了時は自動でcommit
@@ -58,7 +52,7 @@ def fetch_data_from_db(db_config, sql, parse):
             # with句を抜けたら自動でカーソルを閉じる
             with conn.cursor() as cur:
                 cur.execute(sql, {"point_wkt": point_wkt})
-                log_msg_sql = cur.mogrify(sql, {"point_wkt": parse}).decode("utf-8")
+                log_msg_sql = cur.mogrify(sql, {"point_wkt": params}).decode("utf-8")
                 logger.debug(log_msg_sql)
                 rows = cur.fetchall()
                 # rowsを返すので行数取得は別処理へ移行
@@ -94,7 +88,15 @@ def save_to_csv(file_name, rows):
 
 
 def main():
-    fetch_rows = fetch_data_from_db(db_config, sql, point_wkt)
+    # DB接続情報を取得
+    db_config = config.get_db_config()
+
+    # SQL実行の際に渡す引数
+    point_wkt = f"POINT({TARGET_POINT[1]} {TARGET_POINT[0]})"
+
+    # データ取得
+    fetch_rows = fetch_data_from_db(db_config, point_wkt)
+    # 取得したデータをCSVに出力
     save_to_csv(CSV_FILE_NAME, fetch_rows)
 
 
