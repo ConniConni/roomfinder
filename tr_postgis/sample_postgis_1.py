@@ -41,7 +41,7 @@ sql = """
 parse = f"POINT({TARGET_POINT[1]} {TARGET_POINT[0]})"
 
 
-def fetch_data_from_db():
+def fetch_data_from_db(db_config, sql, parse):
 
     # finally句で明示的に接続を閉じるために定義
     conn = None
@@ -87,7 +87,7 @@ def save_to_csv(rows):
 
 
 def main():
-    fetch_rows = fetch_data_from_db()
+    fetch_rows = fetch_data_from_db(db_config, sql, parse)
     save_to_csv(fetch_rows)
 
 
