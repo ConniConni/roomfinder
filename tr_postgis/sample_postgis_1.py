@@ -72,25 +72,11 @@ def fetch_data_from_db(conn, param):
         ORDER BY id;
     """
 
-    try:
-        # 正常終了時は自動でcommit
-        # エラー発生時は自動でrollback（その後except句の処理）
-        # with句を抜けたら自動でカーソルを閉じる
-        with conn.cursor() as cur:
-            cur.execute(sql, {"point_wkt": param})
-            log_msg_sql = cur.mogrify(sql, {"point_wkt": param}).decode("utf-8")
-            logger.debug(log_msg_sql)
-            rows = cur.fetchall()
-            # rowsを返すので行数取得は別処理へ移行
-            # total_rows = len(rows)
-
-    except psycopg2.Error as e:
-        logger.error(f"DBエラーが発生しました。:{e}")
-
-    finally:
-        if conn:
-            conn.close()
-            logger.info("DB切断")
+    with conn.cursor() as cur:
+        cur.execute(sql, {"point_wkt": param})
+        log_msg_sql = cur.mogrify(sql, {"point_wkt": param}).decode("utf-8")
+        logger.debug(log_msg_sql)
+        rows = cur.fetchall()
 
     return rows
 
@@ -124,16 +110,28 @@ def save_to_csv(file_name, rows):
 def main():
     # DB接続情報を取得
     db_config = config.get_db_config()
-
     # SQL実行の際に渡す引数
     point_wkt = f"POINT({TARGET_POINT[1]} {TARGET_POINT[0]})"
 
-    # DB接続
-    conn = connect_db(db_config)
-    # データ取得
-    fetch_rows = fetch_data_from_db(conn, point_wkt)
-    # 取得したデータをCSVに出力
-    save_to_csv(CSV_FILE_NAME, fetch_rows)
+    # 正常終了時は自動でcommit
+    # エラー発生時は自動でrollback（その後except句の処理）
+    # with句を抜けたら自動でカーソルを閉じる
+    try:
+        conn = None  # 初期化
+        # DB接続
+        conn = connect_db(db_config)
+        # データ取得
+        fetch_rows = fetch_data_from_db(conn, point_wkt)
+        # 取得したデータをCSVに出力
+        save_to_csv(CSV_FILE_NAME, fetch_rows)
+
+    except psycopg2.Error as e:
+        logger.error(f"DBエラーが発生しました。:{e}")
+
+    finally:
+        if conn:
+            conn.close()
+            logger.info("DB切断")
 
 
 if __name__ == "__main__":
