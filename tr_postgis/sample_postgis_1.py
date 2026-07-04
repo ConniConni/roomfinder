@@ -45,20 +45,17 @@ def connect_db(db_config):
     return conn
 
 
-def fetch_data_from_db(db_config, param):
+def fetch_data_from_db(conn, param):
     """
     クエリを実行してデータを取得する
 
     args:
-        db_config (dict): DB接続情報
+        conn (object): 接続オブジェクト
         params (string): SQLのパラメータ
 
     return:
         rows (list): クエリの実行結果
     """
-
-    # finally句で明示的に接続を閉じるために定義
-    conn = None
     # 取得したデータの保存先を定義
     rows = []
 
@@ -78,15 +75,14 @@ def fetch_data_from_db(db_config, param):
     try:
         # 正常終了時は自動でcommit
         # エラー発生時は自動でrollback（その後except句の処理）
-        with connect_db(db_config) as conn:
-            # with句を抜けたら自動でカーソルを閉じる
-            with conn.cursor() as cur:
-                cur.execute(sql, {"point_wkt": param})
-                log_msg_sql = cur.mogrify(sql, {"point_wkt": param}).decode("utf-8")
-                logger.debug(log_msg_sql)
-                rows = cur.fetchall()
-                # rowsを返すので行数取得は別処理へ移行
-                # total_rows = len(rows)
+        # with句を抜けたら自動でカーソルを閉じる
+        with conn.cursor() as cur:
+            cur.execute(sql, {"point_wkt": param})
+            log_msg_sql = cur.mogrify(sql, {"point_wkt": param}).decode("utf-8")
+            logger.debug(log_msg_sql)
+            rows = cur.fetchall()
+            # rowsを返すので行数取得は別処理へ移行
+            # total_rows = len(rows)
 
     except psycopg2.Error as e:
         logger.error(f"DBエラーが発生しました。:{e}")
@@ -132,8 +128,10 @@ def main():
     # SQL実行の際に渡す引数
     point_wkt = f"POINT({TARGET_POINT[1]} {TARGET_POINT[0]})"
 
+    # DB接続
+    conn = connect_db(db_config)
     # データ取得
-    fetch_rows = fetch_data_from_db(db_config, point_wkt)
+    fetch_rows = fetch_data_from_db(conn, point_wkt)
     # 取得したデータをCSVに出力
     save_to_csv(CSV_FILE_NAME, fetch_rows)
 
