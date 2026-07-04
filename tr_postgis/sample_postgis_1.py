@@ -118,20 +118,20 @@ def main():
     try:
         conn = None  # 初期化
         # DB接続
-        conn = connect_db(db_config)
-        # データ取得
-        fetch_rows = fetch_data_from_db(conn, point_wkt)
-        # 取得したデータをCSVに出力
-        save_to_csv(CSV_FILE_NAME, fetch_rows)
+        with connect_db(db_config) as conn:
+            # データ取得
+            fetch_rows = fetch_data_from_db(conn, point_wkt)
+            # 取得したデータをCSVに出力
+            save_to_csv(CSV_FILE_NAME, fetch_rows)
 
     except psycopg2.OperationalError as e:
-        logger.error(f"DB接続エラーが発生しました。設定を見直してください。:{e}")
+        logger.error(f"【DB接続エラー】設定を見直してください。:{e}")
 
     except psycopg2.ProgrammingError as e:
-        logger.error(f"SQL実行エラーが発生ました。クエリの内容を確認してください。:{e}")
+        logger.error(f"【SQL実行エラー】クエリの内容を確認してください。:{e}")
 
     except psycopg2.Error as e:
-        logger.error(f"DBエラーが発生しました。:{e}")
+        logger.error(f"【その他DBエラー】:{e}")
 
     finally:
         if conn:
