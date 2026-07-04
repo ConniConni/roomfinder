@@ -37,7 +37,6 @@ def connect_db(db_config):
         conn (object): 接続オブジェクト
     """
 
-    conn = None  # 初期化
     conn = psycopg2.connect(**db_config)
 
     if conn:
@@ -124,6 +123,9 @@ def main():
         fetch_rows = fetch_data_from_db(conn, point_wkt)
         # 取得したデータをCSVに出力
         save_to_csv(CSV_FILE_NAME, fetch_rows)
+
+    except psycopg2.OperationalError as e:
+        logger.error(f"DB接続エラーが発生しました。設定を見直してください。:{e}")
 
     except psycopg2.Error as e:
         logger.error(f"DBエラーが発生しました。:{e}")
