@@ -127,6 +127,9 @@ def main():
     except psycopg2.OperationalError as e:
         logger.error(f"DB接続エラーが発生しました。設定を見直してください。:{e}")
 
+    except psycopg2.ProgrammingError as e:
+        logger.error(f"SQL実行エラーが発生ました。クエリの内容を確認してください。:{e}")
+
     except psycopg2.Error as e:
         logger.error(f"DBエラーが発生しました。:{e}")
 
