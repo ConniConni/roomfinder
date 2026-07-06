@@ -91,10 +91,6 @@ def save_to_csv(file_name, rows):
         rows (list): 書き込み対象のリスト
     """
 
-    if not rows:
-        logger.info("取得結果が0件のためCSVファイルの出力をスキップ")
-        return
-
     header = ["id", "geom"]
 
     with open(file_name, mode="w", encoding="utf-8", newline="") as f:
@@ -124,7 +120,11 @@ def main():
             # データ取得
             fetch_rows = fetch_data_from_db(conn, point_wkt)
 
-        # 取得したデータをCSVに出力
+        # 1件以上のデータが取れているか確認
+        if not fetch_rows:
+            logger.info("取得結果が0件のためCSVファイルの出力をスキップ")
+            return
+        # 取得したデータが1件以上の場合、CSVに出力
         save_to_csv(CSV_FILE_NAME, fetch_rows)
 
     except psycopg2.OperationalError as e:
