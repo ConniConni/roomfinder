@@ -10,6 +10,9 @@ CURRENT_DIR = Path(__file__)
 PROJECT_ROOT_DIR = CURRENT_DIR.parent.parent
 # .envの絶対パスを作成
 ENV_PATH = PROJECT_ROOT_DIR / ".env"
+# .envファイル読み込み接続情報を取得
+load_dotenv(ENV_PATH)
+
 # ログフォルダの絶対パスを作成
 LOG_DIR = CURRENT_DIR.parent / "log"
 
@@ -19,9 +22,6 @@ LOG_LEVEL = logging.DEBUG
 
 def get_db_config():
     logger = logging.getLogger(__name__)
-
-    # .envファイル読み込み接続情報を取得
-    load_dotenv(ENV_PATH)
 
     # .envから値を取得し、psycopg2の接続処理に使用する引数の形にまとめる
     db_config = {
