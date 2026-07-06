@@ -11,13 +11,15 @@
 import csv
 import logging
 import psycopg2
+from pathlib import Path
 
 import config
 
 # --- 定数 ---
 # 基準点:東京タワー
 TARGET_POINT = (35.658, 139.745)
-CSV_FILE_NAME = "extraction_point.csv"
+# 実行結果ファイル名: ./tr_postgis/result/extraction_point.csv
+CSV_FILE_NAME = Path(__file__).parent / "result" / "extraction_point.csv"
 
 
 # --- ロギング設定 ---
