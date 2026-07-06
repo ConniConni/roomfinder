@@ -44,11 +44,40 @@
 
 ---
 
-## 3. テスト仕様
+## 4. 処理フロー
+
+本プログラムの実行フローは以下の通り。
+
+```mermaid
+flowchart TD
+    Start([開始]) --> Setup(ログ設定/環境変数読み込み)
+    Setup --> ConfigCheck{設定チェック}
+
+    ConfigCheck -- 正常 --> Connect[DB接続]
+    ConfigCheck -- 不足あり --> ErrorExit[エラー終了]
+
+    Connect -- 成功 --> Query{空間クエリ実行}
+    Connect -- 接続エラー --> ErrorExit
+
+    Query -- 1件以上 --> CSV[CSV出力]
+    Query -- 0件 --> Skip[スキップ通知]
+    Query -- 取得失敗/エラー --> Disconnect[DB切断]
+    CSV --> Disconnect
+    Skip --> Disconnect
+
+
+    Disconnect --> End([終了])
+    ErrorExit --> End
+
+```
+
+---
+
+## 4. テスト仕様
 
 `pytest` による検証観点を定義する。
 
-### 3.1 config.py 検証 (ID: C-XXX)
+### 4.1 config.py 検証 (ID: C-XXX)
 
 | ID   | 分類 | テスト項目（観点）                       | 期待される結果                                |
 | :--- | :--- | :--------------------------------------- | :-------------------------------------------- |
@@ -60,7 +89,7 @@
 | C-E4 | 異常 | `POSTGRES_PASSWORD` が未設定             | エラーログ出力後、ステータス 1 で終了すること |
 | C-E5 | 異常 | 複数の必須項目が未設定                   | 全不足項目がログに含まれ、ステータス 1 で終了 |
 
-### 3.2 sample_postgis_1.py 検証 (ID: S-XXX)
+### 4.2 sample_postgis_1.py 検証 (ID: S-XXX)
 
 | ID   | 分類 | テスト項目（観点）           | 期待される結果                                 |
 | :--- | :--- | :--------------------------- | :--------------------------------------------- |
