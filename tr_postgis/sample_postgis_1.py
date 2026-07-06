@@ -121,8 +121,9 @@ def main():
         with connect_db(db_config) as conn:
             # データ取得
             fetch_rows = fetch_data_from_db(conn, point_wkt)
-            # 取得したデータをCSVに出力
-            save_to_csv(CSV_FILE_NAME, fetch_rows)
+
+        # 取得したデータをCSVに出力
+        save_to_csv(CSV_FILE_NAME, fetch_rows)
 
     except psycopg2.OperationalError as e:
         logger.error(f"【DB接続エラー】設定を見直してください。:{e}")
