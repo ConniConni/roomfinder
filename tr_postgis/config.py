@@ -14,7 +14,7 @@ ENV_PATH = PROJECT_ROOT_DIR / ".env"
 load_dotenv(ENV_PATH)
 
 # ログフォルダの絶対パスを作成
-LOG_DIR = CURRENT_DIR.parent / "log"
+LOG_DIR = CURRENT_DIR.parent / "logs"
 
 # ログレベルを設定
 LOG_LEVEL = logging.DEBUG
@@ -45,6 +45,12 @@ def get_db_config():
 
 
 def setup_logging(level=LOG_LEVEL):
+
+    # ログディレクトリの存在チェック
+    if not LOG_DIR.exists():
+        # まだロガーが設定されていないので、sys.stderr を使って画面にエラーを出す
+        sys.stderr.write(f"【エラー】logsディレクトリを作成して再実行してください。")
+        sys.exit(1)
 
     # 現在時刻を取得
     now_str = datetime.now().strftime("%Y%m%d_%H%M%S")
