@@ -62,7 +62,7 @@ def test_get_db_config_raises_exit_when_port_missing(monkeypatch, caplog):
 
     # 期待されるログリストを定義
     expected_logs = [
-        "設定エラー: 以下の環境変数が空です: port",
+        "【設定エラー】以下の環境変数が空です: port",
         ".envファイルの設定を確認してください。",
     ]
 
@@ -89,7 +89,7 @@ def test_get_db_config_raises_exit_when_database_missing(monkeypatch, caplog):
 
     # 期待されるログリストを定義
     expected_logs = [
-        "設定エラー: 以下の環境変数が空です: database",
+        "【設定エラー】以下の環境変数が空です: database",
         ".envファイルの設定を確認してください。",
     ]
     # 検証
@@ -114,7 +114,7 @@ def test_get_db_config_raises_exit_when_user_missing(monkeypatch, caplog):
 
     # 期待されるログリストを定義
     expected_logs = [
-        "設定エラー: 以下の環境変数が空です: user",
+        "【設定エラー】以下の環境変数が空です: user",
         ".envファイルの設定を確認してください。",
     ]
     # 検証
@@ -139,7 +139,7 @@ def test_get_db_config_raises_exit_when_password_missing(monkeypatch, caplog):
 
     # 期待されるログリストを定義
     expected_logs = [
-        "設定エラー: 以下の環境変数が空です: password",
+        "【設定エラー】以下の環境変数が空です: password",
         ".envファイルの設定を確認してください。",
     ]
     # 検証
@@ -166,7 +166,7 @@ def test_get_db_config_raises_exit_when_multiple_missing(monkeypatch, caplog):
 
     # 期待されるログリストを定義
     expected_logs = [
-        "設定エラー: 以下の環境変数が空です: port, user",
+        "【設定エラー】以下の環境変数が空です: port, user",
         ".envファイルの設定を確認してください。",
     ]
     # 検証

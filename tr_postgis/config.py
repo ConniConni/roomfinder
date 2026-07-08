@@ -37,7 +37,7 @@ def get_db_config():
             missing_keys.append(key)
 
     if missing_keys:
-        logger.error(f"設定エラー: 以下の環境変数が空です: {', '.join(missing_keys)}")
+        logger.error(f"【設定エラー】以下の環境変数が空です: {', '.join(missing_keys)}")
         logger.error(".envファイルの設定を確認してください。")
         sys.exit(1)
 
