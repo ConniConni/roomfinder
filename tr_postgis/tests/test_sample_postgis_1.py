@@ -17,7 +17,7 @@ class TestPostGISApp:
     def test_02_connect_db_fail(self, mock_connect):
         mock_connect.side_effect = psycopg2.OperationalError("Error")
         with pytest.raises(psycopg2.OperationalError):
-            sample_postgis_1.connect_db({})
+            sample_postgis_1.connect_db({"db": "test"})
 
     # --- fetch_data_from_db ---
     def test_03_fetch_success(self):
