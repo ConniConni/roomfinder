@@ -53,7 +53,7 @@ def fetch_data_from_db(conn, param):
 
     args:
         conn (object): 接続オブジェクト
-        params (string): SQLのパラメータ
+        params (str): SQLのパラメータ
 
     return:
         rows (list): クエリの実行結果
@@ -88,7 +88,7 @@ def save_to_csv(file_name, rows):
     CSVファイルにリストのデータを書き込む
 
     args:
-        file_name (string): ファイル名
+        file_name (str): ファイル名
         rows (list): 書き込み対象のリスト
     """
 
@@ -104,18 +104,33 @@ def save_to_csv(file_name, rows):
         logger.info(f"{len(rows)}件 のデータをファイルに書き込みました。")
 
 
-# --- メイン処理 ---
-def main():
-    # DB接続情報を取得
-    db_config = config.get_db_config()
-    # SQL実行の際に渡す引数が日本国内であることを確認（北緯20°〜45°、東経122°〜154°の間）
-    if 20 <= TARGET_POINT[0] <= 45 and 122 <= TARGET_POINT[1] <= 154:
-        point_wkt = f"POINT({TARGET_POINT[1]} {TARGET_POINT[0]})"
+def validate_target_point(point):
+    """
+    基準点が日本国内（北緯20°〜45°、東経122°〜154°の間）かチェックする
+    args:
+        point (tuple): 基準点の座標。形式は (緯度, 経度) の float タプル
+    return:
+        point_wkt (str): WKT形式の基準点文字列 (例: "POINT(139.745 35.658)")
+    Raises:
+        SystemExit: 基準点が範囲外の場合、エラーログを出力してプログラムを終了する。
+    """
+    lat, lon = point
+    if 20 <= lat <= 45 and 122 <= lon <= 154:
+        point_wkt = f"POINT({lon} {lat})"
+        return point_wkt
     else:
         logger.error(
             "基準点は北緯20°〜45°、東経122°〜154°の間の数値で設定してください。"
         )
         sys.exit(1)
+
+
+# --- メイン処理 ---
+def main():
+    # DB接続情報を取得
+    db_config = config.get_db_config()
+    # SQL実行の際に渡す引数
+    point_wkt = validate_target_point(TARGET_POINT)
 
     # 正常終了時は自動でcommit
     # エラー発生時は自動でrollback（その後except句の処理）
