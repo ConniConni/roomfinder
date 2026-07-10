@@ -12,6 +12,7 @@ import csv
 import logging
 import psycopg2
 from pathlib import Path
+import sys
 
 import config
 
@@ -107,8 +108,14 @@ def save_to_csv(file_name, rows):
 def main():
     # DB接続情報を取得
     db_config = config.get_db_config()
-    # SQL実行の際に渡す引数
-    point_wkt = f"POINT({TARGET_POINT[1]} {TARGET_POINT[0]})"
+    # SQL実行の際に渡す引数が日本国内であることを確認（北緯20°〜45°、東経122°〜154°の間）
+    if 20 <= TARGET_POINT[0] <= 45 and 122 <= TARGET_POINT[1] <= 154:
+        point_wkt = f"POINT({TARGET_POINT[1]} {TARGET_POINT[0]})"
+    else:
+        logger.error(
+            "基準点は北緯20°〜45°、東経122°〜154°の間の数値で設定してください。"
+        )
+        sys.exit(1)
 
     # 正常終了時は自動でcommit
     # エラー発生時は自動でrollback（その後except句の処理）
