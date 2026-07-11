@@ -53,6 +53,22 @@ class TestPostGISApp:
         target_point = sample_postgis_1.validate_target_point((35.555, 139.555))
         assert target_point == f"POINT(139.555 35.555)"
 
+    def test_15_get_point_success(self):
+        target_point = sample_postgis_1.validate_target_point((20.0, 154.0))
+        assert target_point == f"POINT(154.0 20.0)"
+
+    def test_16_get_point_lat_missing(self, caplog):
+        with pytest.raises(SystemExit) as e:
+            sample_postgis_1.validate_target_point((19.999999, 139.555))
+        assert "【設定値エラー】" in caplog.text
+        assert e.value.code == 1
+
+    def test_17_get_point_lon_missing(self, caplog):
+        with pytest.raises(SystemExit) as e:
+            sample_postgis_1.validate_target_point((35.555, 154.000001))
+        assert "【設定値エラー】" in caplog.text
+        assert e.value.code == 1
+
     # --- main (フロー制御) ---
     @patch("sample_postgis_1.config.get_db_config", return_value={})
     @patch("sample_postgis_1.connect_db")
