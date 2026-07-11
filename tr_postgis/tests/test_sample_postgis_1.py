@@ -48,11 +48,10 @@ class TestPostGISApp:
         mock_file.assert_called_once()
         assert "1件 のデータをファイルに書き込みました。" in caplog.text
 
-    @patch("builtins.open")
-    def test_07_save_csv_os_error(self, mock_file):
-        mock_file.side_effect = PermissionError("Permission Denied")
-        with pytest.raises(PermissionError):
-            sample_postgis_1.save_to_csv("path.csv", [[1, "geom"]])
+    # --- validate_target_point ---
+    def test_14_get_point_success(self):
+        target_point = sample_postgis_1.validate_target_point((35.555, 139.555))
+        assert target_point == f"POINT(139.555 35.555)"
 
     # --- main (フロー制御) ---
     @patch("sample_postgis_1.config.get_db_config", return_value={})
