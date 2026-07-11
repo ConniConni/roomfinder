@@ -120,7 +120,7 @@ def validate_target_point(point):
         return point_wkt
     else:
         logger.error(
-            "基準点は北緯20°〜45°、東経122°〜154°の間の数値で設定してください。"
+            "【設定値エラー】基準点は北緯20°〜45°、東経122°〜154°の間の数値で設定してください。"
         )
         sys.exit(1)
 
