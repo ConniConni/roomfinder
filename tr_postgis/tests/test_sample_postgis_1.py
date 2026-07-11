@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import MagicMock, patch, mock_open
 import psycopg2
-import sample_postgis_1  # テスト対象ファイル
+import sample_postgis_1, config  # テスト対象ファイル
 
 
 class TestPostGISApp:
@@ -128,3 +128,18 @@ class TestPostGISApp:
         mock_conn_func.return_value.__enter__.return_value = mock_conn
         sample_postgis_1.main()
         mock_conn.close.assert_called()
+
+    # --- fetch_data_from_db（境界値テスト） ---
+    def test_18_fetch_data_from_db_boundary_value(self):
+        """
+        クエリの境界値をテスト
+        テスト用のDBでクエリを実行すると3件、id=1,2,3のものが取得できることを確認
+        """
+        db_config = config.get_db_config()
+        db_config["database"] = "gis_tr_db_test"
+        conn = sample_postgis_1.connect_db(db_config)
+        point_wkt = sample_postgis_1.validate_target_point((35.658, 139.745))
+        rows = sample_postgis_1.fetch_data_from_db(conn, point_wkt)
+        assert len(rows) == 3
+        actual_ids = [row[0] for row in rows]
+        assert set(actual_ids) == {1, 2, 3}
