@@ -51,10 +51,6 @@ def connect_db(db_config):
     return conn
 
 
-def calculate_expand_deg(radius_m):
-    return radius_m * COEFFICIENT
-
-
 def fetch_data_from_db(conn, param, radius, coefficient):
     """
     クエリを実行してデータを取得する
