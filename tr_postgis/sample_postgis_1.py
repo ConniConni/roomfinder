@@ -142,7 +142,7 @@ def validate_target_point(point):
 
 def validate_execution_settings(radius, coefficient):
     """
-    実行時の設定（距離、係数）の型と妥当性をチェックする
+    実行時の設定（距離、係数）が型変換可能か確認することで妥当性をチェックする
 
     Args:
         radius (int): 検索距離
@@ -152,20 +152,22 @@ def validate_execution_settings(radius, coefficient):
         coefficient
     """
     # 距離のチェック
-    if not isinstance(radius, int) or radius <= 0:
+    try:
+        radius = int(radius)
+        coefficient = float(coefficient)
+
+        # 設定値が負の数だった場合はValueErrorを投げる
+        if radius <= 0 or coefficient <= 0:
+            raise ValueError
+
+        return radius, coefficient
+
+    except (ValueError, TypeError):
         logger.error(
-            f"【設定エラー】SEARCH_RADIUSは正の整数で設定してください。入力値: {radius!r}"
+            "【設定値エラー】SEARCH_RADIUSは正の整数、COEFFICIENTは正の浮動小数で設定してください。\n"
+            f"SEARCH_RADIUS: {radius!r}, COEFFICIENT:{coefficient!r}"
         )
         sys.exit(1)
-
-    # 係数のチェック
-    if not isinstance(coefficient, float) or coefficient <= 0:
-        logger.error(
-            f"【設定エラー】COEFFICIENTは正の浮動小数で設定してください。入力値: {coefficient!r}"
-        )
-        sys.exit(1)
-
-    return radius, coefficient
 
 
 # --- メイン処理 ---
