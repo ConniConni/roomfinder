@@ -19,6 +19,10 @@ import config
 # --- 定数 ---
 # 基準点:東京タワー
 TARGET_POINT = (35.658, 139.745)
+# 検索距離
+SEARCH_RADIUS = 1000
+# 度(°)をメートル(m)に変換する際の係数 北端の北緯45°が0.000013度のためマージンを足した固定値に
+COEFFICIENT = 0.000014
 # 実行結果ファイル名: ./tr_postgis/result/extraction_point.csv
 CSV_FILE_NAME = Path(__file__).parent / "result" / "extraction_point.csv"
 
@@ -47,13 +51,19 @@ def connect_db(db_config):
     return conn
 
 
-def fetch_data_from_db(conn, param):
+def calculate_expand_deg(radius_m):
+    return radius_m * COEFFICIENT
+
+
+def fetch_data_from_db(conn, param, radius, coefficient):
     """
     クエリを実行してデータを取得する
 
     args:
         conn (object): 接続オブジェクト
         params (str): SQLのパラメータ
+        radius (int): 検索距離
+        coefficient (float): マージンを考慮したメートルを度に変換する係数
 
     return:
         rows (list): クエリの実行結果
@@ -61,22 +71,27 @@ def fetch_data_from_db(conn, param):
     # 取得したデータの保存先を定義
     rows = []
 
+    # 検索半径（m）をマージン付きの経緯度（度）に変換
+    expand_deg = radius * coefficient
+
     # 実行するSQL
     sql = """
         SELECT id, ST_AsText(geom) AS geom
         FROM training_data
-        WHERE geom && ST_Expand(ST_GeomFromText(%(point_wkt)s, 4326), 0.015)
+        WHERE geom && ST_Expand(ST_GeomFromText(%(point_wkt)s, 4326), %(deg)s)
         AND ST_DWithin(
             geom::geography,
             ST_GeogFromText(%(point_wkt)s),
-            1000
+            %(dict)s
         )
         ORDER BY id;
     """
 
     with conn.cursor() as cur:
-        cur.execute(sql, {"point_wkt": param})
-        log_msg_sql = cur.mogrify(sql, {"point_wkt": param}).decode("utf-8")
+        cur.execute(sql, {"point_wkt": param, "deg": expand_deg, "dict": radius})
+        log_msg_sql = cur.mogrify(
+            sql, {"point_wkt": param, "deg": expand_deg, "dict": radius}
+        ).decode("utf-8")
         logger.debug(log_msg_sql)
         rows = cur.fetchall()
 
@@ -140,7 +155,7 @@ def main():
         # DB接続
         with connect_db(db_config) as conn:
             # データ取得
-            fetch_rows = fetch_data_from_db(conn, point_wkt)
+            fetch_rows = fetch_data_from_db(conn, point_wkt, SEARCH_RADIUS, COEFFICIENT)
 
         # 1件以上のデータが取れているか確認
         if not fetch_rows:
