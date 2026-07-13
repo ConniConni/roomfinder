@@ -24,14 +24,14 @@ class TestPostGISApp:
         mock_conn = MagicMock()
         mock_cur = mock_conn.cursor.return_value.__enter__.return_value
         mock_cur.fetchall.return_value = [(1, "POINT(0 0)")]
-        rows = sample_postgis_1.fetch_data_from_db(mock_conn, "WKT")
+        rows = sample_postgis_1.fetch_data_from_db(mock_conn, "WKT", 10, 0.15)
         assert len(rows) == 1
 
     def test_04_fetch_empty(self):
         mock_conn = MagicMock()
         mock_cur = mock_conn.cursor.return_value.__enter__.return_value
         mock_cur.fetchall.return_value = []
-        rows = sample_postgis_1.fetch_data_from_db(mock_conn, "WKT")
+        rows = sample_postgis_1.fetch_data_from_db(mock_conn, "WKT", 10, 0.15)
         assert rows == []
 
     def test_05_fetch_sql_error(self):
@@ -39,7 +39,7 @@ class TestPostGISApp:
         mock_cur = mock_conn.cursor.return_value.__enter__.return_value
         mock_cur.execute.side_effect = psycopg2.ProgrammingError("SQL Error")
         with pytest.raises(psycopg2.ProgrammingError):
-            sample_postgis_1.fetch_data_from_db(mock_conn, "WKT")
+            sample_postgis_1.fetch_data_from_db(mock_conn, "WKT", 10, 0.15)
 
     # --- save_to_csv ---
     @patch("builtins.open", new_callable=mock_open)
@@ -68,6 +68,59 @@ class TestPostGISApp:
             sample_postgis_1.validate_target_point((35.555, 154.000001))
         assert "【設定値エラー】" in caplog.text
         assert e.value.code == 1
+
+    # --- validate_execution_settings ---
+    def test_20_isValidate_execution_settings_success(self):
+        raw_radius = 100
+        raw_coefficient = 0.1
+        radius, coefficient = sample_postgis_1.validate_execution_settings(
+            raw_radius, raw_coefficient
+        )
+        assert radius == raw_radius
+        assert coefficient == raw_coefficient
+
+    def test_21_isValidate_execution_settings_str_success(self):
+        raw_radius = "100"
+        raw_coefficient = "0.1"
+        radius, coefficient = sample_postgis_1.validate_execution_settings(
+            raw_radius, raw_coefficient
+        )
+        assert radius == 100
+        assert isinstance(radius, int)
+        assert coefficient == 0.1
+        assert isinstance(coefficient, float)
+
+    def test_22_isValidate_execution_settings_negative_missing(self, caplog):
+        raw_radius = -100
+        raw_coefficient = 0.1
+        with pytest.raises(SystemExit) as e:
+            sample_postgis_1.validate_execution_settings(raw_radius, raw_coefficient)
+        assert e.value.code == 1
+        assert "【設定値エラー】" in caplog.text
+
+    def test_22_isValidate_execution_settings_zero_missing(self, caplog):
+        raw_radius = 100
+        raw_coefficient = "0"
+        with pytest.raises(SystemExit) as e:
+            sample_postgis_1.validate_execution_settings(raw_radius, raw_coefficient)
+        assert e.value.code == 1
+        assert "【設定値エラー】" in caplog.text
+
+    def test_23_isValidate_execution_settings_str_missing(self, caplog):
+        raw_radius = "st"
+        raw_coefficient = 0.1
+        with pytest.raises(SystemExit) as e:
+            sample_postgis_1.validate_execution_settings(raw_radius, raw_coefficient)
+        assert e.value.code == 1
+        assert "【設定値エラー】" in caplog.text
+
+    def test_24_isValidate_execution_settings_list_missing(self, caplog):
+        raw_radius = 10
+        raw_coefficient = [0.1]
+        with pytest.raises(SystemExit) as e:
+            sample_postgis_1.validate_execution_settings(raw_radius, raw_coefficient)
+        assert e.value.code == 1
+        assert "【設定値エラー】" in caplog.text
 
     # --- main (フロー制御) ---
     @patch("sample_postgis_1.config.get_db_config", return_value={})
@@ -139,7 +192,21 @@ class TestPostGISApp:
         db_config["database"] = "gis_tr_db_test"
         conn = sample_postgis_1.connect_db(db_config)
         point_wkt = sample_postgis_1.validate_target_point((35.658, 139.745))
-        rows = sample_postgis_1.fetch_data_from_db(conn, point_wkt)
+        rows = sample_postgis_1.fetch_data_from_db(conn, point_wkt, 1000, 0.000015)
         assert len(rows) == 3
         actual_ids = [row[0] for row in rows]
         assert set(actual_ids) == {1, 2, 3}
+
+    def test_19_fetch_data_from_db_execute_setting_value(self):
+        """
+        クエリのパラメータとなる設定値を変更した場合、取得結果が変わることを確認
+        テスト用のDBでクエリを実行すると1件、id=1のものが取得できることを確認
+        """
+        db_config = config.get_db_config()
+        db_config["database"] = "gis_tr_db_test"
+        conn = sample_postgis_1.connect_db(db_config)
+        point_wkt = sample_postgis_1.validate_target_point((35.658, 139.745))
+        rows = sample_postgis_1.fetch_data_from_db(conn, point_wkt, 500.1, 0.000014)
+        assert len(rows) == 1
+        actual_ids = [row[0] for row in rows]
+        assert set(actual_ids) == {1}
