@@ -82,15 +82,15 @@ def fetch_data_from_db(conn, param, radius, coefficient):
         AND ST_DWithin(
             geom::geography,
             ST_GeogFromText(%(point_wkt)s),
-            %(dict)s
+            %(dist)s
         )
         ORDER BY id;
     """
 
     with conn.cursor() as cur:
-        cur.execute(sql, {"point_wkt": param, "deg": expand_deg, "dict": radius})
+        cur.execute(sql, {"point_wkt": param, "deg": expand_deg, "dist": radius})
         log_msg_sql = cur.mogrify(
-            sql, {"point_wkt": param, "deg": expand_deg, "dict": radius}
+            sql, {"point_wkt": param, "deg": expand_deg, "dist": radius}
         ).decode("utf-8")
         logger.debug(log_msg_sql)
         rows = cur.fetchall()
@@ -140,12 +140,41 @@ def validate_target_point(point):
         sys.exit(1)
 
 
+def validate_execution_settings(radius, coefficient):
+    """
+    実行時の設定（距離、係数）の型と妥当性をチェックする
+
+    Args:
+        radius (int): 検索距離
+        coefficient (float): マージンを考慮したメートルを度に変換する係数
+    Return:
+        radius
+        coefficient
+    """
+    # 距離のチェック
+    if not isinstance(radius, int) or radius <= 0:
+        logger.error(
+            f"【設定エラー】SEARCH_RADIUSは正の整数で設定してください。入力値: {radius!r}"
+        )
+        sys.exit(1)
+
+    # 係数のチェック
+    if not isinstance(coefficient, float) or coefficient <= 0:
+        logger.error(
+            f"【設定エラー】COEFFICIENTは正の浮動小数で設定してください。入力値: {coefficient!r}"
+        )
+        sys.exit(1)
+
+    return radius, coefficient
+
+
 # --- メイン処理 ---
 def main():
     # DB接続情報を取得
     db_config = config.get_db_config()
     # SQL実行の際に渡す引数
     point_wkt = validate_target_point(TARGET_POINT)
+    search_radius, m_to_deg = validate_execution_settings(SEARCH_RADIUS, COEFFICIENT)
 
     # 正常終了時は自動でcommit
     # エラー発生時は自動でrollback（その後except句の処理）
@@ -155,7 +184,7 @@ def main():
         # DB接続
         with connect_db(db_config) as conn:
             # データ取得
-            fetch_rows = fetch_data_from_db(conn, point_wkt, SEARCH_RADIUS, COEFFICIENT)
+            fetch_rows = fetch_data_from_db(conn, point_wkt, search_radius, m_to_deg)
 
         # 1件以上のデータが取れているか確認
         if not fetch_rows:
