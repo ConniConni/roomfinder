@@ -57,7 +57,7 @@ class PostGISProcessor:
         self.csv_path = csv_path
 
         """クラスメソッドで扱うクラス変数"""
-        # self.conn = None
+        self.conn = None
         self.point_wkt = None
         self.fetch_rows = []
         self.is_success_flg = False
@@ -97,6 +97,9 @@ class PostGISProcessor:
             )
             ORDER BY id;
         """
+
+        if self.conn is None:
+            raise RuntimeError("DB接続が確立されていません。")
 
         with self.conn.cursor() as cur:
             cur.execute(
@@ -201,6 +204,9 @@ class PostGISProcessor:
 
         except psycopg2.Error as e:
             logger.error(f"【その他DBエラー】:{e}")
+
+        except Exception as e:
+            logger.error(f"【予期せぬエラー】:{e}")
 
         finally:
             if self.conn:
