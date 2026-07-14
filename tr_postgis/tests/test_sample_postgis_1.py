@@ -145,6 +145,8 @@ class TestPostGISApp:
             processor.validate_execution_settings()
         assert "COEFFICIENTは正の浮動小数で" in str(e.value)
 
+    # --- run ---
+
     # --- main (フロー制御) ---
     @patch("sample_postgis_1.config.get_db_config", return_value={})
     @patch("sample_postgis_1.connect_db")
@@ -206,30 +208,36 @@ class TestPostGISApp:
         mock_conn.close.assert_called()
 
     # --- fetch_data_from_db（境界値テスト） ---
-    def test_18_fetch_data_from_db_boundary_value(self):
+    def test_18_fetch_data_from_db_boundary_value(self, processor):
         """
         クエリの境界値をテスト
         テスト用のDBでクエリを実行すると3件、id=1,2,3のものが取得できることを確認
         """
         db_config = config.get_db_config()
         db_config["database"] = "gis_tr_db_test"
-        conn = sample_postgis_1.connect_db(db_config)
-        point_wkt = sample_postgis_1.validate_target_point((35.658, 139.745))
-        rows = sample_postgis_1.fetch_data_from_db(conn, point_wkt, 1000, 0.000015)
-        assert len(rows) == 3
-        actual_ids = [row[0] for row in rows]
+        processor.db_config = db_config
+        processor.point_wkt = "POINT(139.745 35.658)"
+        processor.search_radius = 1000
+        processor.coefficient = 0.000014
+        processor.connect_db()
+        processor.fetch_data_from_db()
+        assert len(processor.fetch_rows) == 3
+        actual_ids = [row[0] for row in processor.fetch_rows]
         assert set(actual_ids) == {1, 2, 3}
 
-    def test_19_fetch_data_from_db_execute_setting_value(self):
+    def test_19_fetch_data_from_db_execute_setting_value(self, processor):
         """
         クエリのパラメータとなる設定値を変更した場合、取得結果が変わることを確認
         テスト用のDBでクエリを実行すると1件、id=1のものが取得できることを確認
         """
         db_config = config.get_db_config()
         db_config["database"] = "gis_tr_db_test"
-        conn = sample_postgis_1.connect_db(db_config)
-        point_wkt = sample_postgis_1.validate_target_point((35.658, 139.745))
-        rows = sample_postgis_1.fetch_data_from_db(conn, point_wkt, 500.1, 0.000014)
-        assert len(rows) == 1
-        actual_ids = [row[0] for row in rows]
+        processor.db_config = db_config
+        processor.point_wkt = "POINT(139.745 35.658)"
+        processor.search_radius = 500.1
+        processor.coefficient = 0.000014
+        processor.connect_db()
+        processor.fetch_data_from_db()
+        assert len(processor.fetch_rows) == 1
+        actual_ids = [row[0] for row in processor.fetch_rows]
         assert set(actual_ids) == {1}
