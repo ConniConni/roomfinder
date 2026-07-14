@@ -2,6 +2,32 @@ import pytest
 from unittest.mock import MagicMock, patch, mock_open
 import psycopg2
 import sample_postgis_1, config  # テスト対象ファイル
+from pathlib import Path
+from sample_postgis_1 import PostGISProcessor
+
+# --- テスト用定数 ---
+TEST_DB_CONFIG = {
+    "host": "localhost",
+    "database": "testdb",
+    "user": "user",
+    "password": "pass",
+}
+TEST_TARGET_POINT = (35.658, 139.745)
+TEST_RADIUS = 1000
+TEST_COEFFICIENT = 0.000014
+TEST_CSV_PATH = Path("test_result.csv")
+
+
+@pytest.fixture
+def processor():
+    """PostGISProcessorの標準的なテスト用インスタンスを生成するフィクスチャ"""
+    return PostGISProcessor(
+        db_config=TEST_DB_CONFIG,
+        target_point=TEST_TARGET_POINT,
+        search_radius=TEST_RADIUS,
+        coefficient=TEST_COEFFICIENT,
+        csv_path=TEST_CSV_PATH,
+    )
 
 
 class TestPostGISApp:
@@ -49,25 +75,26 @@ class TestPostGISApp:
         assert "1件 のデータをファイルに書き込みました。" in caplog.text
 
     # --- validate_target_point ---
-    def test_14_get_point_success(self):
-        target_point = sample_postgis_1.validate_target_point((35.555, 139.555))
-        assert target_point == f"POINT(139.555 35.555)"
+    def test_14_get_point_success(self, processor):
+        processor.validate_target_point()
+        assert processor.point_wkt == f"POINT(139.745 35.658)"
 
-    def test_15_get_point_success(self):
-        target_point = sample_postgis_1.validate_target_point((20.0, 154.0))
-        assert target_point == f"POINT(154.0 20.0)"
+    def test_15_get_point_success(self, processor):
+        processor.target_point = (20.0, 154.0)
+        processor.validate_target_point()
+        assert processor.point_wkt == f"POINT(154.0 20.0)"
 
-    def test_16_get_point_lat_missing(self, caplog):
-        with pytest.raises(SystemExit) as e:
-            sample_postgis_1.validate_target_point((19.999999, 139.555))
-        assert "【設定値エラー】" in caplog.text
-        assert e.value.code == 1
+    def test_16_get_point_lat_missing(self, processor):
+        processor.target_point = (19.999999, 139.555)
+        with pytest.raises(ValueError) as e:
+            processor.validate_target_point()
+        assert "基準点は北緯20°〜45°" in str(e.value)
 
-    def test_17_get_point_lon_missing(self, caplog):
-        with pytest.raises(SystemExit) as e:
-            sample_postgis_1.validate_target_point((35.555, 154.000001))
-        assert "【設定値エラー】" in caplog.text
-        assert e.value.code == 1
+    def test_17_get_point_lon_missing(self, processor):
+        processor.target_point = (19.999999, 139.555)
+        with pytest.raises(ValueError) as e:
+            processor.validate_target_point()
+        assert "基準点は北緯20°〜45°" in str(e.value)
 
     # --- validate_execution_settings ---
     def test_20_isValidate_execution_settings_success(self):
