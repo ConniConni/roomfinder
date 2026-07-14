@@ -47,26 +47,34 @@ class TestPostGISApp:
             processor.connect_db()
 
     # --- fetch_data_from_db ---
-    def test_03_fetch_success(self):
+    def test_03_fetch_success(self, processor, caplog):
         mock_conn = MagicMock()
-        mock_cur = mock_conn.cursor.return_value.__enter__.return_value
+        processor.conn = mock_conn
+        mock_cur = processor.conn.cursor.return_value.__enter__.return_value
         mock_cur.fetchall.return_value = [(1, "POINT(0 0)")]
-        rows = sample_postgis_1.fetch_data_from_db(mock_conn, "WKT", 10, 0.15)
-        assert len(rows) == 1
+        processor.fetch_data_from_db()
+        assert len(processor.fetch_rows) == 1
 
-    def test_04_fetch_empty(self):
+    def test_04_fetch_empty(self, processor):
         mock_conn = MagicMock()
-        mock_cur = mock_conn.cursor.return_value.__enter__.return_value
+        processor.conn = mock_conn
+        mock_cur = processor.conn.cursor.return_value.__enter__.return_value
         mock_cur.fetchall.return_value = []
-        rows = sample_postgis_1.fetch_data_from_db(mock_conn, "WKT", 10, 0.15)
-        assert rows == []
+        processor.fetch_data_from_db()
+        assert processor.fetch_rows == []
 
-    def test_05_fetch_sql_error(self):
+    def test_05_fetch_sql_error(self, processor):
         mock_conn = MagicMock()
-        mock_cur = mock_conn.cursor.return_value.__enter__.return_value
+        processor.conn = mock_conn
+        mock_cur = processor.conn.cursor.return_value.__enter__.return_value
         mock_cur.execute.side_effect = psycopg2.ProgrammingError("SQL Error")
         with pytest.raises(psycopg2.ProgrammingError):
-            sample_postgis_1.fetch_data_from_db(mock_conn, "WKT", 10, 0.15)
+            processor.fetch_data_from_db()
+
+    def test_26_conn_error(self, processor):
+        with pytest.raises(RuntimeError) as e:
+            processor.fetch_data_from_db()
+        assert "DB接続が確立されていません。" == str(e.value)
 
     # --- save_to_csv ---
     @patch("builtins.open", new_callable=mock_open)
