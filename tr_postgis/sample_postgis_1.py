@@ -12,7 +12,6 @@ import csv
 import logging
 import psycopg2
 from pathlib import Path
-import sys
 
 import config
 
@@ -26,184 +25,207 @@ COEFFICIENT = 0.000014
 # 実行結果ファイル名: ./tr_postgis/result/extraction_point.csv
 CSV_FILE_NAME = Path(__file__).parent / "result" / "extraction_point.csv"
 
-
 # --- ロギング設定 ---
 config.setup_logging()
 logger = logging.getLogger(__name__)
 
 
-# --- 関数定義 ---
-def connect_db(db_config):
-    """
-    DBへの接続を確立する
+# --- クラス定義 ---
+class PostGISProcessor:
+    """基準点から指定の距離内にある点をCSVファイルに出力するクラス
 
-    args:
-        db_config (dict): DB接続情報
-
-    return:
-        conn (object): 接続オブジェクト
-    """
-
-    conn = psycopg2.connect(**db_config)
-
-    if conn:
-        logger.info("DB接続")
-    return conn
-
-
-def fetch_data_from_db(conn, param, radius, coefficient):
-    """
-    クエリを実行してデータを取得する
-
-    args:
-        conn (object): 接続オブジェクト
-        params (str): SQLのパラメータ
-        radius (int): 検索距離
-        coefficient (float): マージンを考慮したメートルを度に変換する係数
-
-    return:
-        rows (list): クエリの実行結果
-    """
-    # 取得したデータの保存先を定義
-    rows = []
-
-    # 検索半径（m）をマージン付きの経緯度（度）に変換
-    expand_deg = radius * coefficient
-
-    # 実行するSQL
-    sql = """
-        SELECT id, ST_AsText(geom) AS geom
-        FROM training_data
-        WHERE geom && ST_Expand(ST_GeomFromText(%(point_wkt)s, 4326), %(deg)s)
-        AND ST_DWithin(
-            geom::geography,
-            ST_GeogFromText(%(point_wkt)s),
-            %(dist)s
-        )
-        ORDER BY id;
-    """
-
-    with conn.cursor() as cur:
-        cur.execute(sql, {"point_wkt": param, "deg": expand_deg, "dist": radius})
-        log_msg_sql = cur.mogrify(
-            sql, {"point_wkt": param, "deg": expand_deg, "dist": radius}
-        ).decode("utf-8")
-        logger.debug(log_msg_sql)
-        rows = cur.fetchall()
-
-    return rows
-
-
-def save_to_csv(file_name, rows):
-    """
-    CSVファイルにリストのデータを書き込む
-
-    args:
-        file_name (str): ファイル名
-        rows (list): 書き込み対象のリスト
-    """
-
-    header = ["id", "geom"]
-
-    with open(file_name, mode="w", encoding="utf-8", newline="") as f:
-        write = csv.writer(f)
-
-        # ヘッダー書き込み
-        write.writerow(header)
-        # 取得したidとgeomを書き込み
-        write.writerows(rows)
-        logger.info(f"{len(rows)}件 のデータをファイルに書き込みました。")
-
-
-def validate_target_point(point):
-    """
-    基準点が日本国内（北緯20°〜45°、東経122°〜154°の間）かチェックする
-    args:
-        point (tuple): 基準点の座標。形式は (緯度, 経度) の float タプル
-    return:
-        point_wkt (str): WKT形式の基準点文字列 (例: "POINT(139.745 35.658)")
-    Raises:
-        SystemExit: 基準点が範囲外の場合、エラーログを出力してプログラムを終了する。
-    """
-    lat, lon = point
-    if 20 <= lat <= 45 and 122 <= lon <= 154:
-        point_wkt = f"POINT({lon} {lat})"
-        return point_wkt
-    else:
-        logger.error(
-            "【設定値エラー】基準点は北緯20°〜45°、東経122°〜154°の間の数値で設定してください。"
-        )
-        sys.exit(1)
-
-
-def validate_execution_settings(radius, coefficient):
-    """
-    実行時の設定（距離、係数）が型変換可能か確認することで妥当性をチェックする
+    以下の処理をメソッドとして持つ
+        DB接続処理
+        設定値が意図した型、範囲であるかを検証
+        クエリの実行
+        CSV書き込み
 
     Args:
-        radius (int): 検索距離
-        coefficient (float): マージンを考慮したメートルを度に変換する係数
-    Return:
-        radius
-        coefficient
+        db_config (dict): DB接続情報
+        target_point (tuple): 基準点の座標。形式は (緯度, 経度) の float タプル
+        search_radius (int | str): 検索距離
+        coefficient (float| int | str): マージンを考慮したメートルを度に変換する係数
+        csv_path (str | Path): 読み込むCSVファイルのパス
     """
-    # 距離のチェック
-    try:
-        radius = int(radius)
-        coefficient = float(coefficient)
 
-        # 設定値が負の数だった場合はValueErrorを投げる
-        if radius <= 0 or coefficient <= 0:
-            raise ValueError
+    def __init__(self, db_config, target_point, search_radius, coefficient, csv_path):
+        """インスタンス変数で初期化するクラス変数"""
+        self.db_config = db_config
+        self.target_point = target_point
+        self.search_radius = search_radius  # クラスメソッドで整数型に変換する
+        self.coefficient = coefficient  # クラスメソッドで浮動小数型に変換する
+        self.csv_path = csv_path
 
-        return radius, coefficient
+        """クラスメソッドで扱うクラス変数"""
+        # self.conn = None
+        self.point_wkt = None
+        self.fetch_rows = []
+        self.is_success_flg = False
 
-    except (ValueError, TypeError):
-        logger.error(
-            "【設定値エラー】SEARCH_RADIUSは正の整数、COEFFICIENTは正の浮動小数で設定してください。\n"
-            f"SEARCH_RADIUS: {radius!r}, COEFFICIENT:{coefficient!r}"
-        )
-        sys.exit(1)
+    def connect_db(self):
+        """
+        DBへの接続を確立する
+
+        return:
+            conn (object): 接続オブジェクト
+        """
+
+        self.conn = psycopg2.connect(**self.db_config)
+
+        if self.conn:
+            logger.info("DB接続")
+
+        return self.conn
+
+    def fetch_data_from_db(self):
+        """
+        クエリを実行してデータを取得する
+        """
+
+        # 検索半径（m）をマージン付きの経緯度（度）に変換
+        expand_deg = self.search_radius * self.coefficient
+
+        # 実行するSQL
+        sql = """
+            SELECT id, ST_AsText(geom) AS geom
+            FROM training_data
+            WHERE geom && ST_Expand(ST_GeomFromText(%(point_wkt)s, 4326), %(deg)s)
+            AND ST_DWithin(
+                geom::geography,
+                ST_GeogFromText(%(point_wkt)s),
+                %(dist)s
+            )
+            ORDER BY id;
+        """
+
+        with self.conn.cursor() as cur:
+            cur.execute(
+                sql,
+                {
+                    "point_wkt": self.point_wkt,
+                    "deg": expand_deg,
+                    "dist": self.search_radius,
+                },
+            )
+            log_msg_sql = cur.mogrify(
+                sql,
+                {
+                    "point_wkt": self.point_wkt,
+                    "deg": expand_deg,
+                    "dist": self.search_radius,
+                },
+            ).decode("utf-8")
+            logger.debug(log_msg_sql)
+            self.fetch_rows = cur.fetchall()
+
+    def save_to_csv(self):
+        """
+        CSVファイルにリストのデータを書き込む
+        """
+
+        header = ["id", "geom"]
+
+        with open(self.csv_path, mode="w", encoding="utf-8", newline="") as f:
+            write = csv.writer(f)
+
+            # ヘッダー書き込み
+            write.writerow(header)
+            # 取得したidとgeomを書き込み
+            write.writerows(self.fetch_rows)
+            logger.info(
+                f"{len(self.fetch_rows)}件 のデータをファイルに書き込みました。"
+            )
+
+    def validate_target_point(self):
+        """
+        基準点が日本国内（北緯20°〜45°、東経122°〜154°の間）かチェックする
+
+        Raises:
+            基準点が範囲外の場合、独自エラーを呼び出し元に投げる。
+        """
+        lat, lon = self.target_point
+        if 20 <= lat <= 45 and 122 <= lon <= 154:
+            self.point_wkt = f"POINT({lon} {lat})"
+        else:
+            raise ValueError(
+                "基準点は北緯20°〜45°、東経122°〜154°の間の数値で設定してください。"
+            )
+
+    def validate_execution_settings(self):
+        """
+        実行時の設定（距離、係数）が型変換可能か確認することで妥当性をチェックする
+
+        Raises:
+            正しく型変換できないもしくは負の数の場合、独自エラーを呼び出し元に投げる
+        """
+        # 距離のチェック
+        try:
+            self.search_radius = int(self.search_radius)
+            self.coefficient = float(self.coefficient)
+
+            # 設定値が負の数だった場合はValueErrorを投げる
+            if self.search_radius <= 0 or self.coefficient <= 0:
+                raise ValueError
+
+        except (ValueError, TypeError):
+            raise ValueError(
+                "SEARCH_RADIUSは正の整数、COEFFICIENTは正の浮動小数で設定してください。\n"
+                f"SEARCH_RADIUS: {self.search_radius!r}, COEFFICIENT:{self.coefficient!r}"
+            )
+
+    def run(self):
+
+        try:
+            self.validate_target_point()
+            self.validate_execution_settings()
+
+            with self.connect_db() as conn:
+                # データ取得
+                self.fetch_data_from_db()
+
+            # 1件以上のデータが取れているか確認
+            if not self.fetch_rows:
+                logger.info("取得結果が0件のためCSVファイルの出力をスキップ")
+                return self.is_success_flg
+            # 取得したデータが1件以上の場合、CSVに出力
+            self.save_to_csv()
+            self.is_success_flg = True
+
+        except ValueError as e:
+            logger.error(f"【設定値エラー】{e}")
+        except psycopg2.OperationalError as e:
+            logger.error(f"【DB接続エラー】設定を見直してください。:{e}")
+
+        except psycopg2.ProgrammingError as e:
+            logger.error(f"【SQL実行エラー】クエリの内容を確認してください。:{e}")
+
+        except psycopg2.Error as e:
+            logger.error(f"【その他DBエラー】:{e}")
+
+        finally:
+            if self.conn:
+                self.conn.close()
+                logger.info("DB切断")
+
+        return self.is_success_flg
 
 
 # --- メイン処理 ---
 def main():
+    logger.info("---- 処理開始 ----")
     # DB接続情報を取得
     db_config = config.get_db_config()
-    # SQL実行の際に渡す引数
-    point_wkt = validate_target_point(TARGET_POINT)
-    search_radius, m_to_deg = validate_execution_settings(SEARCH_RADIUS, COEFFICIENT)
+    # 実行プロセスをインスタンス化
+    process = PostGISProcessor(
+        db_config, TARGET_POINT, SEARCH_RADIUS, COEFFICIENT, CSV_FILE_NAME
+    )
+    # 処理実行
+    success = process.run()
 
-    # 正常終了時は自動でcommit
-    # エラー発生時は自動でrollback（その後except句の処理）
-    # with句を抜けたら自動でカーソルを閉じる
-    try:
-        conn = None  # 初期化
-        # DB接続
-        with connect_db(db_config) as conn:
-            # データ取得
-            fetch_rows = fetch_data_from_db(conn, point_wkt, search_radius, m_to_deg)
-
-        # 1件以上のデータが取れているか確認
-        if not fetch_rows:
-            logger.info("取得結果が0件のためCSVファイルの出力をスキップ")
-            return
-        # 取得したデータが1件以上の場合、CSVに出力
-        save_to_csv(CSV_FILE_NAME, fetch_rows)
-
-    except psycopg2.OperationalError as e:
-        logger.error(f"【DB接続エラー】設定を見直してください。:{e}")
-
-    except psycopg2.ProgrammingError as e:
-        logger.error(f"【SQL実行エラー】クエリの内容を確認してください。:{e}")
-
-    except psycopg2.Error as e:
-        logger.error(f"【その他DBエラー】:{e}")
-
-    finally:
-        if conn:
-            conn.close()
-            logger.info("DB切断")
+    if success:
+        logger.info("---- 正常終了 ----")
+    else:
+        logger.info("---- 異常終了 ----")
 
 
 if __name__ == "__main__":
