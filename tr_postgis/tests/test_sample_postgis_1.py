@@ -97,57 +97,43 @@ class TestPostGISApp:
         assert "基準点は北緯20°〜45°" in str(e.value)
 
     # --- validate_execution_settings ---
-    def test_20_isValidate_execution_settings_success(self):
-        raw_radius = 100
-        raw_coefficient = 0.1
-        radius, coefficient = sample_postgis_1.validate_execution_settings(
-            raw_radius, raw_coefficient
-        )
-        assert radius == raw_radius
-        assert coefficient == raw_coefficient
+    def test_20_isValidate_execution_settings_success(self, processor):
+        processor.validate_execution_settings()
+        assert processor.search_radius == 1000
+        assert processor.coefficient == 0.000014
 
-    def test_21_isValidate_execution_settings_str_success(self):
-        raw_radius = "100"
-        raw_coefficient = "0.1"
-        radius, coefficient = sample_postgis_1.validate_execution_settings(
-            raw_radius, raw_coefficient
-        )
-        assert radius == 100
-        assert isinstance(radius, int)
-        assert coefficient == 0.1
-        assert isinstance(coefficient, float)
+    def test_21_isValidate_execution_settings_str_success(self, processor):
+        processor.search_radius = "100"
+        processor.coefficient = "0.1"
+        processor.validate_execution_settings()
+        assert processor.search_radius == 100
+        assert isinstance(processor.search_radius, int)
+        assert processor.coefficient == 0.1
+        assert isinstance(processor.coefficient, float)
 
-    def test_22_isValidate_execution_settings_negative_missing(self, caplog):
-        raw_radius = -100
-        raw_coefficient = 0.1
-        with pytest.raises(SystemExit) as e:
-            sample_postgis_1.validate_execution_settings(raw_radius, raw_coefficient)
-        assert e.value.code == 1
-        assert "【設定値エラー】" in caplog.text
+    def test_22_isValidate_execution_settings_negative_missing(self, processor):
+        processor.search_radius = -100
+        with pytest.raises(ValueError) as e:
+            processor.validate_execution_settings()
+        assert "SEARCH_RADIUSは正の整数、" in str(e.value)
 
-    def test_22_isValidate_execution_settings_zero_missing(self, caplog):
-        raw_radius = 100
-        raw_coefficient = "0"
-        with pytest.raises(SystemExit) as e:
-            sample_postgis_1.validate_execution_settings(raw_radius, raw_coefficient)
-        assert e.value.code == 1
-        assert "【設定値エラー】" in caplog.text
+    def test_23_isValidate_execution_settings_zero_missing(self, processor):
+        processor.coefficient = "0"
+        with pytest.raises(ValueError) as e:
+            processor.validate_execution_settings()
+        assert "COEFFICIENTは正の浮動小数で" in str(e.value)
 
-    def test_23_isValidate_execution_settings_str_missing(self, caplog):
-        raw_radius = "st"
-        raw_coefficient = 0.1
-        with pytest.raises(SystemExit) as e:
-            sample_postgis_1.validate_execution_settings(raw_radius, raw_coefficient)
-        assert e.value.code == 1
-        assert "【設定値エラー】" in caplog.text
+    def test_24_isValidate_execution_settings_str_missing(self, processor):
+        processor.search_radius = "str"
+        with pytest.raises(ValueError) as e:
+            processor.validate_execution_settings()
+        assert "SEARCH_RADIUSは正の整数" in str(e.value)
 
-    def test_24_isValidate_execution_settings_list_missing(self, caplog):
-        raw_radius = 10
-        raw_coefficient = [0.1]
-        with pytest.raises(SystemExit) as e:
-            sample_postgis_1.validate_execution_settings(raw_radius, raw_coefficient)
-        assert e.value.code == 1
-        assert "【設定値エラー】" in caplog.text
+    def test_25_isValidate_execution_settings_list_missing(self, processor):
+        processor.coefficient = [0.1]
+        with pytest.raises(ValueError) as e:
+            processor.validate_execution_settings()
+        assert "COEFFICIENTは正の浮動小数で" in str(e.value)
 
     # --- main (フロー制御) ---
     @patch("sample_postgis_1.config.get_db_config", return_value={})
