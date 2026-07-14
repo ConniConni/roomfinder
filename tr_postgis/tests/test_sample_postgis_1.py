@@ -34,16 +34,17 @@ class TestPostGISApp:
 
     # --- connect_db ---
     @patch("psycopg2.connect")
-    def test_01_connect_db_success(self, mock_connect, caplog):
+    def test_01_connect_db_success(self, mock_connect, processor, caplog):
         mock_connect.return_value = MagicMock()
-        sample_postgis_1.connect_db({"db": "test"})
+        conn = processor.connect_db()
+        assert conn == processor.conn
         assert "DB接続" in caplog.text
 
     @patch("psycopg2.connect")
-    def test_02_connect_db_fail(self, mock_connect):
+    def test_02_connect_db_fail(self, mock_connect, processor):
         mock_connect.side_effect = psycopg2.OperationalError("Error")
         with pytest.raises(psycopg2.OperationalError):
-            sample_postgis_1.connect_db({"db": "test"})
+            processor.connect_db()
 
     # --- fetch_data_from_db ---
     def test_03_fetch_success(self):
