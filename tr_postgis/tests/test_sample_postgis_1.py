@@ -78,8 +78,9 @@ class TestPostGISApp:
 
     # --- save_to_csv ---
     @patch("builtins.open", new_callable=mock_open)
-    def test_06_save_csv_success(self, mock_file, caplog):
-        sample_postgis_1.save_to_csv("path.csv", [[1, "geom"]])
+    def test_06_save_csv_success(self, mock_file, processor, caplog):
+        processor.fetch_rows = [(1, "POINT(0 0)")]
+        processor.save_to_csv()
         mock_file.assert_called_once()
         assert "1件 のデータをファイルに書き込みました。" in caplog.text
 
