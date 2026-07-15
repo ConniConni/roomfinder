@@ -26,21 +26,26 @@
 
 各モジュールの責務と提供する主要関数。
 
-### tr_postgis/config.py
+### 2.1 tr_postgis/config.py
 
 | 関数名            | 引数 | 戻り値 | 説明                                               |
 | :---------------- | :--- | :----- | :------------------------------------------------- |
 | `setup_logging()` | なし | なし   | ログフォルダの作成と初期設定を行う。               |
 | `get_db_config()` | なし | `dict` | `.env` から情報を取得。不足があれば `SystemExit`。 |
 
-### tr_postgis/sample_postgis_1.py
+### 2.2 tr_postgis/sample_postgis_1.py
 
-| 関数名                 | 引数        | 戻り値 | 説明                                   |
-| :--------------------- | :---------- | :----- | :------------------------------------- |
-| `connect_db()`         | `dict`      | `conn` | PostgreSQL(PostGIS)への接続を確立。    |
-| `fetch_data_from_db()` | `conn, str` | `list` | 空間検索クエリを実行。                 |
-| `save_to_csv()`        | `str, list` | なし   | 結果をCSV保存。0件時は保存をスキップ。 |
-| `main()`               | なし        | なし   | メイン処理。                           |
+#### 2.2.1 PostGISProcessor クラス
+
+| メソッド名                      | 引数                                    | 戻り値 | 説明                                                                       |
+| :------------------------------ | :-------------------------------------- | :----- | :------------------------------------------------------------------------- |
+| `__init__`                      | `dict, tuple, int/str, float/str, Path` | なし   | 設定値の注入（DI）と初期化。                                               |
+| `validate_target_point()`       | なし                                    | なし   | 基準点のバリデーション（日本国内か）とWKT変換。不備があれば `ValueError`。 |
+| `validate_execution_settings()` | なし                                    | なし   | 検索距離・係数の型変換と正数チェック。不備があれば `ValueError`。          |
+| `connect_db()`                  | なし                                    | `conn` | DB接続を確立。`self.conn` に保持。                                         |
+| `fetch_data_from_db()`          | なし                                    | なし   | 空間クエリを実行。結果を `self.fetch_rows` に格納。                        |
+| `save_to_csv()`                 | なし                                    | なし   | `self.fetch_rows` をCSV保存。                                              |
+| `run()`                         | なし                                    | `bool` | 上記メソッドを統括。バリデーション・接続・実行・保存・切断を制御。         |
 
 ---
 
