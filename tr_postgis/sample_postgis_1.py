@@ -187,11 +187,11 @@ class PostGISProcessor:
                 self.fetch_data_from_db()
 
             # 1件以上のデータが取れているか確認
-            if not self.fetch_rows:
+            if len(self.fetch_rows) > 0:
+                # 取得したデータが1件以上の場合、CSVに出力
+                self.save_to_csv()
+            else:
                 logger.info("取得結果が0件のためCSVファイルの出力をスキップ")
-                return self.is_success_flg
-            # 取得したデータが1件以上の場合、CSVに出力
-            self.save_to_csv()
             self.is_success_flg = True
 
         except ValueError as e:
