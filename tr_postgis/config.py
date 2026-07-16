@@ -70,7 +70,7 @@ def setup_logging(level=LOG_LEVEL):
 
     # フォーマッタを作成
     formatter = logging.Formatter(
-        "%(asctime)s - %(levelname)s - %(name)s - %(lineno)s - %(message)s"
+        "%(asctime)s - %(levelname)s - %(threadName)s - %(name)s - %(lineno)s - %(message)s"
     )
     console_handler.setFormatter(formatter)
     file_handler.setFormatter(formatter)
