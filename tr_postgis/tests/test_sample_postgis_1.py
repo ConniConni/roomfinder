@@ -28,7 +28,6 @@ def processor():
         target_point=TEST_TARGET_POINT,
         search_radius=TEST_RADIUS,
         coefficient=TEST_COEFFICIENT,
-        csv_path=TEST_CSV_PATH,
     )
 
 
@@ -77,14 +76,6 @@ class TestPostGISApp:
         with pytest.raises(RuntimeError) as e:
             processor.fetch_data_from_db()
         assert "DB接続が確立されていません。" == str(e.value)
-
-    # --- save_to_csv ---
-    @patch("builtins.open", new_callable=mock_open)
-    def test_06_save_csv_success(self, mock_file, processor, caplog):
-        processor.fetch_rows = [(1, "POINT(0 0)")]
-        processor.save_to_csv()
-        mock_file.assert_called_once()
-        assert "1件 のデータをファイルに書き込みました。" in caplog.text
 
     # --- validate_target_point ---
     def test_14_get_point_success(self, processor):
@@ -150,10 +141,7 @@ class TestPostGISApp:
     # --- run ---
     @patch.object(PostGISProcessor, "connect_db")
     @patch.object(PostGISProcessor, "fetch_data_from_db")
-    @patch.object(PostGISProcessor, "save_to_csv")
-    def test_08_run_success_flow(
-        self, mock_save, mock_fetch, mock_conn_func, processor
-    ):
+    def test_08_run_success_flow(self, mock_fetch, mock_conn_func, processor):
         # 接続オブジェクトの代わりとなるモックを作成
         mock_conn = MagicMock()
         # connect_dbが呼ばれたらモックを返す
@@ -163,111 +151,108 @@ class TestPostGISApp:
         processor.conn = mock_conn
         processor.fetch_rows = [(1, "POINT(0 0)")]
 
-        result = processor.run()
+        result, rows = processor.run()
 
         assert result is True
+        assert rows == [(1, "POINT(0 0)")]
         mock_fetch.assert_called_once()
-        mock_save.assert_called_once()
         mock_conn.close.assert_called_once()
 
     @patch.object(PostGISProcessor, "connect_db")
     @patch.object(PostGISProcessor, "fetch_data_from_db")
-    @patch.object(PostGISProcessor, "save_to_csv")
-    def test_09_run_skip_flow(
-        self, mock_save, mock_fetch, mock_conn_func, processor, caplog
-    ):
+    def test_09_run_skip_flow(self, mock_fetch, mock_conn_func, processor, caplog):
         mock_conn = MagicMock()
         mock_conn_func.return_value = mock_conn
         mock_conn.__enter__.return_value = mock_conn
         processor.conn = mock_conn
         processor.fetch_rows = []  # 0件
 
-        result = processor.run()
+        result, row = processor.run()
 
         assert result is True
-        assert "取得結果が0件のためCSVファイルの出力をスキップ" in caplog.text
+        assert row == []
         mock_fetch.assert_called_once()
-        mock_save.assert_not_called()
         mock_conn.close.assert_called_once()
 
     @patch.object(PostGISProcessor, "connect_db")
     @patch.object(PostGISProcessor, "fetch_data_from_db")
-    @patch.object(PostGISProcessor, "save_to_csv")
-    def test_10_run_op_error(
-        self, mock_save, mock_fetch, mock_conn_func, processor, caplog
-    ):
+    def test_10_run_op_error(self, mock_fetch, mock_conn_func, processor, caplog):
         mock_conn_func.side_effect = psycopg2.OperationalError("Conn Fail")
 
-        result = processor.run()
+        result, row = processor.run()
         assert result is False
+        assert row == []
         assert "【DB接続エラー】" in caplog.text
         mock_fetch.assert_not_called()
-        mock_save.assert_not_called()
 
     @patch.object(PostGISProcessor, "connect_db")
     @patch.object(PostGISProcessor, "fetch_data_from_db")
-    @patch.object(PostGISProcessor, "save_to_csv")
-    def test_11_run_prog_error(
-        self, mock_save, mock_fetch, mock_conn_func, processor, caplog
-    ):
+    def test_11_run_prog_error(self, mock_fetch, mock_conn_func, processor, caplog):
         mock_conn = MagicMock()
         mock_conn_func.return_value = mock_conn
         mock_conn.__enter__.return_value = mock_conn
         processor.conn = mock_conn
         mock_fetch.side_effect = psycopg2.ProgrammingError("SQL Fail")
 
-        result = processor.run()
+        result, row = processor.run()
 
         assert result is False
+        assert row == []
         assert "【SQL実行エラー】" in caplog.text
-        mock_save.assert_not_called()
         mock_conn.close.assert_called_once()
 
     @patch.object(PostGISProcessor, "connect_db")
     @patch.object(PostGISProcessor, "fetch_data_from_db")
-    @patch.object(PostGISProcessor, "save_to_csv")
     def test_12_run_generic_db_error(
-        self, mock_save, mock_fetch, mock_conn_func, processor, caplog
+        self, mock_fetch, mock_conn_func, processor, caplog
     ):
         mock_conn = MagicMock()
         mock_conn_func.return_value = mock_conn
         mock_conn.__enter__.return_value = mock_conn
         processor.conn = mock_conn
         mock_fetch.side_effect = psycopg2.Error("Generic Fail")
-        result = processor.run()
+        result, row = processor.run()
+
         assert result is False
+        assert row == []
         assert "【その他DBエラー】" in caplog.text
-        mock_save.assert_not_called()
         mock_conn.close.assert_called_once()
 
     @patch.object(PostGISProcessor, "connect_db")
     @patch.object(PostGISProcessor, "fetch_data_from_db")
-    @patch.object(PostGISProcessor, "save_to_csv")
-    def test_13_run_value_error(
-        self, mock_save, mock_fetch, mock_conn_func, processor, caplog
-    ):
+    def test_13_run_value_error(self, mock_fetch, mock_conn_func, processor, caplog):
         processor.target_point = (19.999999, 139.555)
-        result = processor.run()
+        result, row = processor.run()
+
         assert result is False
+        assert row == []
         assert "【設定値エラー】" in caplog.text
         mock_conn_func.assert_not_called()
         mock_fetch.assert_not_called()
-        mock_save.assert_not_called()
 
     # --- main (フロー制御) ---
     @patch("config.get_db_config", return_value={"db": "test"})
     @patch.object(PostGISProcessor, "run")
-    def test_27_main_success(self, mock_run, _, caplog):
-        mock_run.return_value = True
+    @patch("sample_postgis_1.save_to_csv")
+    def test_27_main_success(self, mock_save, mock_run, _, caplog):
+        mock_run.return_value = True, [[1, "geom"]]
+        mock_save.return_value
         sample_postgis_1.main()
+
         assert "---- 正常終了 ----" in caplog.text
+        mock_save.assert_called_once()
 
     @patch("config.get_db_config", return_value={"db": "test"})
     @patch.object(PostGISProcessor, "run")
-    def test_28_main_fail(self, mock_run, _, caplog):
-        mock_run.return_value = False
+    @patch("sample_postgis_1.save_to_csv")
+    def test_28_main_fail(self, mock_save, mock_run, _, caplog):
+        mock_run.return_value = False, []
+
         sample_postgis_1.main()
+
+        assert "取得結果が0件のためCSVファイルの出力をスキップ" in caplog.text
         assert "---- 異常終了 ----" in caplog.text
+        mock_save.assert_not_called()
 
     # --- fetch_data_from_db（境界値テスト） ---
     def test_18_fetch_data_from_db_boundary_value(self, processor):
@@ -303,3 +288,10 @@ class TestPostGISApp:
         assert len(processor.fetch_rows) == 1
         actual_ids = [row[0] for row in processor.fetch_rows]
         assert set(actual_ids) == {1}
+
+    # --- save_to_csv ---
+    @patch("builtins.open", new_callable=mock_open)
+    def test_06_save_csv_success(self, mock_file, caplog):
+        sample_postgis_1.save_to_csv("path.csv", [[1, "geom"]])
+        mock_file.assert_called_once()
+        assert "1件 のデータをファイルに書き込みました。" in caplog.text

@@ -35,26 +35,23 @@ class PostGISProcessor:
     """基準点から指定の距離内にある点をCSVファイルに出力するクラス
 
     以下の処理をメソッドとして持つ
-        DB接続処理
         設定値が意図した型、範囲であるかを検証
+        DB接続処理
         クエリの実行
-        CSV書き込み
 
     Args:
         db_config (dict): DB接続情報
         target_point (tuple): 基準点の座標。形式は (緯度, 経度) の float タプル
         search_radius (int | str): 検索距離
         coefficient (float| int | str): マージンを考慮したメートルを度に変換する係数
-        csv_path (str | Path): 読み込むCSVファイルのパス
     """
 
-    def __init__(self, db_config, target_point, search_radius, coefficient, csv_path):
+    def __init__(self, db_config, target_point, search_radius, coefficient):
         """インスタンス変数で初期化するクラス変数"""
         self.db_config = db_config
         self.target_point = target_point
         self.search_radius = search_radius  # クラスメソッドで整数型に変換する
         self.coefficient = coefficient  # クラスメソッドで浮動小数型に変換する
-        self.csv_path = csv_path
 
         """クラスメソッドで扱うクラス変数"""
         self.conn = None
@@ -121,24 +118,6 @@ class PostGISProcessor:
             logger.debug(log_msg_sql)
             self.fetch_rows = cur.fetchall()
 
-    def save_to_csv(self):
-        """
-        CSVファイルにリストのデータを書き込む
-        """
-
-        header = ["id", "geom"]
-
-        with open(self.csv_path, mode="w", encoding="utf-8", newline="") as f:
-            write = csv.writer(f)
-
-            # ヘッダー書き込み
-            write.writerow(header)
-            # 取得したidとgeomを書き込み
-            write.writerows(self.fetch_rows)
-            logger.info(
-                f"{len(self.fetch_rows)}件 のデータをファイルに書き込みました。"
-            )
-
     def validate_target_point(self):
         """
         基準点が日本国内（北緯20°〜45°、東経122°〜154°の間）かチェックする
@@ -177,6 +156,13 @@ class PostGISProcessor:
             )
 
     def run(self):
+        """
+        実行関数
+
+        returns:
+            self.is_success_flg (boolean): 処理成功フラグ
+            self.fetch_rows (list): 該当地点の取得結果のリスト
+        """
 
         try:
             self.validate_target_point()
@@ -186,12 +172,6 @@ class PostGISProcessor:
                 # データ取得
                 self.fetch_data_from_db()
 
-            # 1件以上のデータが取れているか確認
-            if len(self.fetch_rows) > 0:
-                # 取得したデータが1件以上の場合、CSVに出力
-                self.save_to_csv()
-            else:
-                logger.info("取得結果が0件のためCSVファイルの出力をスキップ")
             self.is_success_flg = True
 
         except ValueError as e:
@@ -213,7 +193,25 @@ class PostGISProcessor:
                 self.conn.close()
                 logger.info("DB切断")
 
-        return self.is_success_flg
+        return self.is_success_flg, self.fetch_rows
+
+
+# --- CSV書き込み処理 ---
+def save_to_csv(csv_path, rows):
+    """
+    CSVファイルにヘッダー付きでリストのデータを書き込む
+    args:
+        csv_path (str | Path): 読み込むCSVファイルのパス
+        rows (list): 書き込み対象のリスト
+    """
+    header = ["id", "geom"]
+    with open(csv_path, mode="w", encoding="utf-8", newline="") as f:
+        write = csv.writer(f)
+        # ヘッダー書き込み
+        write.writerow(header)
+        # 取得したidとgeomを書き込み
+        write.writerows(rows)
+        logger.info(f"{len(rows)}件 のデータをファイルに書き込みました。")
 
 
 # --- メイン処理 ---
@@ -222,11 +220,16 @@ def main():
     # DB接続情報を取得
     db_config = config.get_db_config()
     # 実行プロセスをインスタンス化
-    process = PostGISProcessor(
-        db_config, TARGET_POINT, SEARCH_RADIUS, COEFFICIENT, CSV_FILE_NAME
-    )
+    process = PostGISProcessor(db_config, TARGET_POINT, SEARCH_RADIUS, COEFFICIENT)
     # 処理実行
-    success = process.run()
+    success, fetch_rows = process.run()
+
+    # 1件以上のデータが取れているか確認
+    if len(fetch_rows) > 0:
+        # 取得したデータが1件以上の場合、CSVに出力
+        save_to_csv(CSV_FILE_NAME, fetch_rows)
+    else:
+        logger.info("取得結果が0件のためCSVファイルの出力をスキップ")
 
     if success:
         logger.info("---- 正常終了 ----")
