@@ -12,12 +12,17 @@ import csv
 import logging
 import psycopg2
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import config
 
 # --- 定数 ---
-# 基準点:東京タワー
-TARGET_POINT = (35.658, 139.745)
+# 基準点
+TARGET_LOCATIONS = [
+    (35.658, 139.745, "東京タワー"),
+    (35.710, 139.810, "スカイツリー"),
+    (35.681, 139.767, "東京駅"),
+]
 # 検索距離
 SEARCH_RADIUS = 1000
 # 度(°)をメートル(m)に変換する際の係数 北端の北緯45°が0.000013度のためマージンを足した固定値に
@@ -193,7 +198,7 @@ class PostGISProcessor:
                 self.conn.close()
                 logger.info("DB切断")
 
-        return self.is_success_flg, self.fetch_rows
+        return self.is_success_flg, self.fetch_rows, self.target_point
 
 
 # --- CSV書き込み処理 ---
@@ -219,19 +224,50 @@ def main():
     logger.info("---- 処理開始 ----")
     # DB接続情報を取得
     db_config = config.get_db_config()
-    # 実行プロセスをインスタンス化
-    process = PostGISProcessor(db_config, TARGET_POINT, SEARCH_RADIUS, COEFFICIENT)
-    # 処理実行
-    success, fetch_rows = process.run()
+
+    logger.info("---- マルチスレッド処理開始 ----")
+    # マルチスレッドで取得したリストの格納先
+    all_combined_rows = []
+    # マルチスレッドの成功回数
+    success_count = 0
+    with ThreadPoolExecutor(max_workers=3, thread_name_prefix="Thread") as executor:
+        # スレッドに地点ごとに処理を投入
+        future_to_point = {
+            executor.submit(
+                PostGISProcessor(db_config, (lat, lon), SEARCH_RADIUS, COEFFICIENT).run
+            ): label
+            for lat, lon, label in TARGET_LOCATIONS
+        }
+
+        # スレッドが完了したら結果を取得
+        for future in as_completed(future_to_point):
+            label = future_to_point[future]
+            try:
+                success, rows, point = future.result()
+                if success and len(rows) > 0:
+                    logger.info(f"{label}({point}): {len(rows)} 件取得")
+                    all_combined_rows.extend(rows)
+                    success_count += 1
+                elif success and len(rows) == 1:
+                    logger.info(f"{label}({point}): 該当データなし")
+                    success_count += 1
+                else:
+                    logger.error(
+                        f"【エラー】{label}({point})の実行スレッドでエラー発生"
+                    )
+            except Exception as e:
+                logger.error(f"【予期せぬ例外】{label}: {e}")
+
+    logger.info(f"全スレッド終了。成功地点: {success_count}/{len(TARGET_LOCATIONS)}")
 
     # 1件以上のデータが取れているか確認
-    if len(fetch_rows) > 0:
+    if len(all_combined_rows) > 0:
         # 取得したデータが1件以上の場合、CSVに出力
-        save_to_csv(CSV_FILE_NAME, fetch_rows)
+        save_to_csv(CSV_FILE_NAME, all_combined_rows)
     else:
         logger.info("取得結果が0件のためCSVファイルの出力をスキップ")
 
-    if success:
+    if success_count == len(TARGET_LOCATIONS):
         logger.info("---- 正常終了 ----")
     else:
         logger.info("---- 異常終了 ----")
