@@ -15,6 +15,11 @@ TEST_DB_CONFIG = {
     "password": "pass",
 }
 TEST_TARGET_POINT = (35.658, 139.745)
+TARGET_LOCATIONS = [
+    (35.658, 139.745, "東京タワー"),
+    (43.062, 141.353, "札幌市時計台"),
+    (26.217, 127.714, "首里城正殿跡"),
+]
 TEST_RADIUS = 1000
 TEST_COEFFICIENT = 0.000014
 TEST_CSV_PATH = Path("test_result.csv")
@@ -151,10 +156,11 @@ class TestPostGISApp:
         processor.conn = mock_conn
         processor.fetch_rows = [(1, "POINT(0 0)")]
 
-        result, rows = processor.run()
+        result, rows, point = processor.run()
 
         assert result is True
         assert rows == [(1, "POINT(0 0)")]
+        assert point == (35.658, 139.745)
         mock_fetch.assert_called_once()
         mock_conn.close.assert_called_once()
 
@@ -167,10 +173,11 @@ class TestPostGISApp:
         processor.conn = mock_conn
         processor.fetch_rows = []  # 0件
 
-        result, row = processor.run()
+        result, row, point = processor.run()
 
         assert result is True
         assert row == []
+        assert point == (35.658, 139.745)
         mock_fetch.assert_called_once()
         mock_conn.close.assert_called_once()
 
@@ -179,9 +186,10 @@ class TestPostGISApp:
     def test_10_run_op_error(self, mock_fetch, mock_conn_func, processor, caplog):
         mock_conn_func.side_effect = psycopg2.OperationalError("Conn Fail")
 
-        result, row = processor.run()
+        result, row, point = processor.run()
         assert result is False
         assert row == []
+        assert point == (35.658, 139.745)
         assert "【DB接続エラー】" in caplog.text
         mock_fetch.assert_not_called()
 
@@ -194,10 +202,11 @@ class TestPostGISApp:
         processor.conn = mock_conn
         mock_fetch.side_effect = psycopg2.ProgrammingError("SQL Fail")
 
-        result, row = processor.run()
+        result, row, point = processor.run()
 
         assert result is False
         assert row == []
+        assert point == (35.658, 139.745)
         assert "【SQL実行エラー】" in caplog.text
         mock_conn.close.assert_called_once()
 
@@ -211,10 +220,11 @@ class TestPostGISApp:
         mock_conn.__enter__.return_value = mock_conn
         processor.conn = mock_conn
         mock_fetch.side_effect = psycopg2.Error("Generic Fail")
-        result, row = processor.run()
+        result, row, point = processor.run()
 
         assert result is False
         assert row == []
+        assert point == (35.658, 139.745)
         assert "【その他DBエラー】" in caplog.text
         mock_conn.close.assert_called_once()
 
@@ -222,35 +232,119 @@ class TestPostGISApp:
     @patch.object(PostGISProcessor, "fetch_data_from_db")
     def test_13_run_value_error(self, mock_fetch, mock_conn_func, processor, caplog):
         processor.target_point = (19.999999, 139.555)
-        result, row = processor.run()
+        result, row, point = processor.run()
 
         assert result is False
         assert row == []
+        assert point == (19.999999, 139.555)
         assert "【設定値エラー】" in caplog.text
         mock_conn_func.assert_not_called()
         mock_fetch.assert_not_called()
 
     # --- main (フロー制御) ---
+    @patch(
+        "sample_postgis_1.TARGET_LOCATIONS",
+        [(35.0, 139.0, "地点A"), (36.0, 140.0, "地点B"), (37.0, 141.0, "地点C")],
+    )
     @patch("config.get_db_config", return_value={"db": "test"})
     @patch.object(PostGISProcessor, "run")
     @patch("sample_postgis_1.save_to_csv")
     def test_27_main_success(self, mock_save, mock_run, _, caplog):
-        mock_run.return_value = True, [[1, "geom"]]
+        mock_run.side_effect = [
+            (True, [(1, "geom1")], (35.0, 139.0)),
+            (True, [(2, "geom2"), (3, "geom3")], (36.0, 140.0)),
+            (True, [(4, "geom"), (5, "geom5"), (6, "geom6")], (37.0, 141.0)),
+        ]
         mock_save.return_value
         sample_postgis_1.main()
+
+        args, _ = mock_save.call_args
+        all_rows = args[1]  # 第1引数はcsvのパス、第2引数が結果のリスト
+        assert len(all_rows) == 6
 
         assert "---- 正常終了 ----" in caplog.text
         mock_save.assert_called_once()
 
+    @patch(
+        "sample_postgis_1.TARGET_LOCATIONS",
+        [(35.0, 139.0, "地点A"), (36.0, 140.0, "地点B"), (37.0, 141.0, "地点C")],
+    )
     @patch("config.get_db_config", return_value={"db": "test"})
     @patch.object(PostGISProcessor, "run")
     @patch("sample_postgis_1.save_to_csv")
-    def test_28_main_fail(self, mock_save, mock_run, _, caplog):
-        mock_run.return_value = False, []
+    def test_28_main_success_no_results(self, mock_save, mock_run, _, caplog):
+        mock_run.side_effect = [
+            (True, [(1, "geom1")], (35.0, 139.0)),
+            (True, [(2, "geom2"), (3, "geom3")], (36.0, 140.0)),
+            (True, [], (37.0, 141.0)),
+        ]
+        sample_postgis_1.main()
 
+        args, _ = mock_save.call_args
+        all_rows = args[1]  # 第1引数はcsvのパス、第2引数が結果のリスト
+        assert len(all_rows) == 3
+
+        assert "---- 正常終了 ----" in caplog.text
+        mock_save.assert_called_once()
+
+    @patch(
+        "sample_postgis_1.TARGET_LOCATIONS",
+        [(35.0, 139.0, "地点A"), (36.0, 140.0, "地点B"), (37.0, 141.0, "地点C")],
+    )
+    @patch("config.get_db_config", return_value={"db": "test"})
+    @patch.object(PostGISProcessor, "run")
+    @patch("sample_postgis_1.save_to_csv")
+    def test_29_main_no_result(self, mock_save, mock_run, _, caplog):
+        mock_run.side_effect = [
+            (True, [], (35.0, 139.0)),
+            (True, [], (36.0, 140.0)),
+            (True, [], (37.0, 141.0)),
+        ]
         sample_postgis_1.main()
 
         assert "取得結果が0件のためCSVファイルの出力をスキップ" in caplog.text
+        assert "---- 正常終了 ----" in caplog.text
+        mock_save.assert_not_called()
+
+    @patch(
+        "sample_postgis_1.TARGET_LOCATIONS",
+        [(35.0, 139.0, "地点A"), (36.0, 140.0, "地点B"), (37.0, 141.0, "地点C")],
+    )
+    @patch("config.get_db_config", return_value={"db": "test"})
+    @patch.object(PostGISProcessor, "run")
+    @patch("sample_postgis_1.save_to_csv")
+    def test_30_main_partial_fail(self, mock_save, mock_run, _, caplog):
+        mock_run.side_effect = [
+            (True, [(1, "geom1")], (35.0, 139.0)),
+            (True, [(2, "geom2"), (3, "geom3")], (36.0, 140.0)),
+            (False, [], (37.0, 141.0)),
+        ]
+
+        sample_postgis_1.main()
+
+        args, _ = mock_save.call_args
+        all_rows = args[1]  # 第1引数はcsvのパス、第2引数が結果のリスト
+        assert len(all_rows) == 3
+
+        mock_save.assert_called_once()
+        assert "---- 異常終了 ----" in caplog.text
+        mock_save.assert_called_once()
+
+    @patch(
+        "sample_postgis_1.TARGET_LOCATIONS",
+        [(35.0, 139.0, "地点A"), (36.0, 140.0, "地点B"), (37.0, 141.0, "地点C")],
+    )
+    @patch("config.get_db_config", return_value={"db": "test"})
+    @patch.object(PostGISProcessor, "run")
+    @patch("sample_postgis_1.save_to_csv")
+    def test_31_main_fail(self, mock_save, mock_run, _, caplog):
+        mock_run.side_effect = [
+            (False, [], (35.0, 139.0)),
+            (False, [], (36.0, 140.0)),
+            (False, [], (37.0, 141.0)),
+        ]
+        sample_postgis_1.main()
+
         assert "---- 異常終了 ----" in caplog.text
         mock_save.assert_not_called()
 

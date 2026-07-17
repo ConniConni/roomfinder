@@ -287,11 +287,12 @@ def main():
 
     logger.info(f"全スレッド終了。成功地点: {success_count}/{len(TARGET_LOCATIONS)}")
 
-    # 1件以上のデータが取れているか確認
+    # 1件以上のデータが取れている場合はCSV書き込み
     if len(all_combined_rows) > 0:
         # 取得したデータが1件以上の場合、CSVに出力
         save_to_csv(CSV_FILE_NAME, all_combined_rows)
-    else:
+    # SQL実行でエラーが発生していないが、取得データ数が0件の場合は、CSV書き込み処理をスキップ
+    if success_count == len(TARGET_LOCATIONS) and len(all_combined_rows) == 0:
         logger.info("取得結果が0件のためCSVファイルの出力をスキップ")
 
     end_time = time.perf_counter()
