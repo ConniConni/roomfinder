@@ -36,6 +36,11 @@ TARGET_LOCATIONS = [
 SEARCH_RADIUS = 1000
 # 度(°)をメートル(m)に変換する際の係数 北端の北緯45°が0.000013度のためマージンを足した固定値に
 COEFFICIENT = 0.000014
+# スレッド生成数
+MAX_WORKERS = 3
+# スレッド名
+THREAD_NAME_PREFIX = "Thread"
+
 # 実行結果ファイル名: ./tr_postgis/result/extraction_point.csv
 CSV_FILE_NAME = Path(__file__).parent / "result" / "extraction_point.csv"
 
@@ -60,7 +65,13 @@ class PostGISProcessor:
         coefficient (float| int | str): マージンを考慮したメートルを度に変換する係数
     """
 
-    def __init__(self, db_config, target_point, search_radius, coefficient):
+    def __init__(
+        self,
+        db_config,
+        target_point,
+        search_radius,
+        coefficient,
+    ):
         """インスタンス変数で初期化するクラス変数"""
         self.db_config = db_config
         self.target_point = target_point
@@ -244,7 +255,9 @@ def main():
     all_combined_rows = []
     # マルチスレッドの成功回数
     success_count = 0
-    with ThreadPoolExecutor(max_workers=3, thread_name_prefix="Thread") as executor:
+    with ThreadPoolExecutor(
+        max_workers=MAX_WORKERS, thread_name_prefix=THREAD_NAME_PREFIX
+    ) as executor:
         # スレッドに地点ごとに処理を投入
         future_to_point = {
             executor.submit(
