@@ -61,22 +61,32 @@
 ```mermaid
 flowchart TD
     Start([開始]) --> Setup(ログ設定/環境変数読み込み)
-    Setup --> ConfigCheck{設定チェック}
+    Setup --> ThreadPool[ThreadPoolExecutor 開始]
+    subgraph Parallel[並列実行領域]
+        direction TB
+        ConfigCheck{設定チェック}
 
-    ConfigCheck -- 正常 --> Connect[DB接続]
-    ConfigCheck -- 不足あり --> ErrorExit[エラー終了]
+        ConfigCheck -- 正常 --> Connect[DB接続]
+        ConfigCheck -- 不足あり --> ErrorExit_1[例外処理]
 
-    Connect -- 成功 --> Query{空間クエリ実行}
-    Connect -- 接続エラー --> ErrorExit
+        Connect -- 成功 --> Query{空間クエリ実行}
+        Connect -- 例外処理 --> ErrorExit_2[例外処理]
 
-    Query --> Disconnect[DB切断]
-    Query -- 取得失敗/エラー --> Disconnect[DB切断]
-    Disconnect -- 1件以上 --> CSV[CSV出力]
-    Disconnect -- 0件 --> Skip[スキップ通知]
+        Query --> Disconnect[DB切断]
+        Query -- 取得失敗/エラー --> ErrorExit_2
+        ErrorExit_2 --> Disconnect
+        Disconnect　--> TreadMessage
+        ErrorExit_1 --> TreadMessage[子Thread処理終了]
+
+    end
+    ThreadPool --> Parallel
+    Parallel　--> Collector[main: as_completed で結果を回収]
+    Collector --> Aggregator[結果を一つのリストに合流]
+    Aggregator -- 1件以上 --> CSV[CSV出力]
+    Aggregator -- 0件 --> Skip[スキップ通知]
 
     CSV --> End([終了])
     Skip --> End
-    ErrorExit --> End
 
 ```
 
