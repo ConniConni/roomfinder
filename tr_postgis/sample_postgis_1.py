@@ -11,6 +11,7 @@
 import csv
 import logging
 import psycopg2
+import time
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -22,6 +23,14 @@ TARGET_LOCATIONS = [
     (35.658, 139.745, "東京タワー"),
     (35.710, 139.810, "スカイツリー"),
     (35.681, 139.767, "東京駅"),
+    (43.062, 141.353, "札幌市時計台"),
+    (40.828, 140.748, "ねぶたの家 ワ・ラッセ"),
+    (36.562, 136.662, "兼六園"),
+    (34.665, 135.432, "ユニバーサル・スタジオ・ジャパン"),
+    (34.185, 133.819, "金刀比羅宮（御本宮）"),
+    (34.296, 132.320, "嚴島神社（宮島）"),
+    (33.515, 130.534, "太宰府天満宮"),
+    (26.217, 127.714, "首里城正殿跡"),
 ]
 # 検索距離
 SEARCH_RADIUS = 1000
@@ -168,7 +177,7 @@ class PostGISProcessor:
             self.is_success_flg (boolean): 処理成功フラグ
             self.fetch_rows (list): 該当地点の取得結果のリスト
         """
-
+        start_time = time.perf_counter()
         try:
             self.validate_target_point()
             self.validate_execution_settings()
@@ -198,6 +207,10 @@ class PostGISProcessor:
                 self.conn.close()
                 logger.info("DB切断")
 
+            end_time = time.perf_counter()
+            actual_time = end_time - start_time
+            logger.info(f"実行時間: {actual_time:.3f} 秒")
+
         return self.is_success_flg, self.fetch_rows, self.target_point
 
 
@@ -221,6 +234,7 @@ def save_to_csv(csv_path, rows):
 
 # --- メイン処理 ---
 def main():
+    start_time = time.perf_counter()
     logger.info("---- 処理開始 ----")
     # DB接続情報を取得
     db_config = config.get_db_config()
@@ -248,7 +262,7 @@ def main():
                     logger.info(f"{label}({point}): {len(rows)} 件取得")
                     all_combined_rows.extend(rows)
                     success_count += 1
-                elif success and len(rows) == 1:
+                elif success and len(rows) == 0:
                     logger.info(f"{label}({point}): 該当データなし")
                     success_count += 1
                 else:
@@ -267,10 +281,12 @@ def main():
     else:
         logger.info("取得結果が0件のためCSVファイルの出力をスキップ")
 
+    end_time = time.perf_counter()
+    actual_time = end_time - start_time
     if success_count == len(TARGET_LOCATIONS):
-        logger.info("---- 正常終了 ----")
+        logger.info(f"---- 正常終了 ---- 実行時間: {actual_time:.3f} 秒 ")
     else:
-        logger.info("---- 異常終了 ----")
+        logger.info(f"---- 異常終了 ---- 実行時間: {actual_time:.3f} 秒")
 
 
 if __name__ == "__main__":
