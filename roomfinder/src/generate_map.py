@@ -32,8 +32,21 @@ def visualize_on_map_match_properties(point):
         show=False,
     ).add_to(m)
 
-    folium.LayerControl().add_to(m)
+    # 駅グループを作成
+    group_station = folium.FeatureGroup(name="駅")
 
+    # 駅グループに駅を追加
+    folium.Marker(
+        location=[33.59126, 130.39863],
+        popup=folium.Popup("天神(1号線(空港線))", max_width=300),
+        tooltip="クリックで詳細表示",
+        icon=folium.Icon(color="red", icon="train", prefix="fa"),
+    ).add_to(group_station)
+
+    # Mapインスタンスに駅グループを追加
+    group_station.add_to(m)
+
+    folium.LayerControl().add_to(m)
     # HTMLファイルを出力
     m.save(file_name)
 
