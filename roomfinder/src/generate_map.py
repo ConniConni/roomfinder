@@ -1,17 +1,113 @@
 import folium
+from shapely import wkt, get_coordinates
 
-target_point = (130.402333, 33.591472)  # アクロス
+target_point = (33.591472, 130.402333)  # アクロス
 file_name = "map_output.html"
 
+# visualize_on_map_match_properties()のロジック確認用のリスト
+test_properties_data = [
+    # (物件ID, 物件名, 家賃, 物件座標, 駅ID, 駅名, 路線名, 駅座標, スーパーID, スーパー名, スーパー座標)
+    # 物件1: 赤坂駅・サニー赤坂
+    (
+        1,
+        "レジデンス赤坂タワー",
+        85000,
+        "POINT(130.391 33.588)",
+        101,
+        "赤坂駅",
+        "空港線",
+        "POINT(130.394 33.587)",
+        201,
+        "サニー 赤坂店",
+        "POINT(130.392 33.589)",
+    ),
+    # 物件2: 大濠公園駅・マックスバリュ
+    (
+        2,
+        "大濠パークサイドマンション",
+        120000,
+        "POINT(130.378 33.590)",
+        102,
+        "大濠公園駅",
+        "空港線",
+        "POINT(130.379 33.589)",
+        202,
+        "マックスバリュ エクスプレス大濠店",
+        "POINT(130.377 33.591)",
+    ),
+    # 物件3: 【駅が2つある場合】レコードが2行になります（これがJOINの特徴です）
+    (
+        3,
+        "天神ビジネスセンターレジデンス",
+        150000,
+        "POINT(130.400 33.592)",
+        103,
+        "天神駅",
+        "空港線",
+        "POINT(130.401 33.591)",
+        203,
+        "イオンショッパーズ福岡",
+        "POINT(130.399 33.594)",
+    ),
+    (
+        3,
+        "天神ビジネスセンターレジデンス",
+        150000,
+        "POINT(130.400 33.592)",
+        101,
+        "赤坂駅",
+        "空港線",
+        "POINT(130.394 33.587)",
+        203,
+        "イオンショッパーズ福岡",
+        "POINT(130.399 33.594)",
+    ),
+    # 物件4: 薬院駅・ボンラパス
+    (
+        4,
+        "薬院サウスガーデン",
+        95000,
+        "POINT(130.400 33.582)",
+        104,
+        "薬院駅",
+        "七隈線",
+        "POINT(130.402 33.581)",
+        204,
+        "ボンラパス 薬院店",
+        "POINT(130.399 33.583)",
+    ),
+    # 物件5: 舞鶴（駅もスーパーも重複）
+    (
+        5,
+        "舞鶴アパートメント",
+        70000,
+        "POINT(130.392 33.592)",
+        101,
+        "赤坂駅",
+        "空港線",
+        "POINT(130.394 33.587)",
+        201,
+        "サニー 赤坂店",
+        "POINT(130.392 33.589)",
+    ),
+]
 
-def visualize_on_map_match_properties(point):
-    target_lng = point[0]
-    target_lat = point[1]
-    m = folium.Map(location=[target_lat, target_lng], zoom_start=15)
+
+def wkt_to_lat_lng_list(point_wkt):
+    geom = wkt.loads(point_wkt)
+    coords = get_coordinates(geom)
+    lng = coords[0][0]
+    lat = coords[0][1]
+    return [lat, lng]
+
+
+def visualize_on_map_match_properties(point, rows):
+    lat, lng = point
+    m = folium.Map(location=[lat, lng], zoom_start=15)
 
     # 中心点にマーカーを追加
     folium.Marker(
-        location=[target_lat, target_lng],
+        location=[lat, lng],
         popup=folium.Popup("アクロス福岡", max_width=300),
         tooltip="クリックで詳細表示",
     ).add_to(m)
@@ -39,30 +135,64 @@ def visualize_on_map_match_properties(point):
     # 物件グループを作成
     group_properties = folium.FeatureGroup(name="物件")
 
-    # 駅グループに駅を追加
-    folium.Marker(
-        location=[33.589955, 130.379615],
-        popup=folium.Popup("大濠公園(1号線(空港線))", max_width=300),
-        tooltip="クリックで詳細表示",
-        icon=folium.Icon(color="red", icon="train", prefix="fa"),
-    ).add_to(group_station)
+    properties_summary = {}  # 物件IDをキーにして情報をまとめる辞書
+    unique_stations = {}  # 駅IDをキーにして情報をまとめる辞書
+    unique_markets = {}  # スーパーIDをキーにして情報をまとめる辞書
 
-    # スーパーマーケットグループにスーパーを追加
-    folium.Marker(
-        location=[33.5912791, 130.3817206],
-        popup=folium.Popup("Hazama", max_width=300),
-        tooltip="クリックで詳細表示",
-        icon=folium.Icon(color="orange", icon="shopping-basket", prefix="fa"),
-    ).add_to(group_super_market)
+    for row in rows:
+        (
+            properties_name_id,
+            properties_name,
+            properties_rent,
+            properties_point_wkt,
+            stations_id,
+            stations_name,
+            stations_route_name,
+            stations_point_wkt,
+            super_market_id,
+            super_market_name,
+            super_market_point_wkt,
+        ) = row
 
-    # 物件グループに物件を追加
-    popup_text = f"ラフィーナ大濠<br>近隣情報: 大濠公園 xx m, Hazama xx m"
-    folium.Marker(
-        location=[33.591033, 130.379752],
-        popup=folium.Popup(popup_text, max_width=300),
-        tooltip="クリックで詳細表示",
-        icon=folium.Icon(color="green", icon="building", prefix="fa"),
-    ).add_to(group_properties)
+        if not stations_id in unique_stations:
+            unique_stations[stations_id] = {
+                "name": f"{stations_name}({stations_route_name})",
+                "latlng": wkt_to_lat_lng_list(stations_point_wkt),
+            }
+
+        if not super_market_id in unique_markets:
+            unique_markets[stations_id] = {
+                "name": super_market_name,
+                "latlng": wkt_to_lat_lng_list(super_market_point_wkt),
+            }
+
+    for _, info in unique_stations.items():
+
+        # 駅グループに駅を追加
+        folium.Marker(
+            location=info["latlng"],
+            popup=folium.Popup(info["name"], max_width=300),
+            tooltip="クリックで詳細表示",
+            icon=folium.Icon(color="red", icon="train", prefix="fa"),
+        ).add_to(group_station)
+
+    for _, info in unique_markets.items():
+        # スーパーマーケットグループにスーパーを追加
+        folium.Marker(
+            location=info["latlng"],
+            popup=folium.Popup(info["name"], max_width=300),
+            tooltip="クリックで詳細表示",
+            icon=folium.Icon(color="orange", icon="shopping-basket", prefix="fa"),
+        ).add_to(group_super_market)
+
+        # 物件グループに物件を追加
+        # popup_text = f"{properties_name}<br>周辺の駅: {stations_name}, <br>周辺の店: {super_market_name}"
+        # folium.Marker(
+        #     location=wkt_to_lat_lng_list(properties_point_wkt),
+        #     popup=folium.Popup(popup_text, max_width=300),
+        #     tooltip="クリックで詳細表示",
+        #     icon=folium.Icon(color="green", icon="building", prefix="fa"),
+        # ).add_to(group_properties)
 
     # Mapインスタンスに駅・スーパーマーケット・物件グループを追加
     group_station.add_to(m)
@@ -74,4 +204,4 @@ def visualize_on_map_match_properties(point):
     m.save(file_name)
 
 
-visualize_on_map_match_properties(target_point)
+visualize_on_map_match_properties(target_point, test_properties_data)
