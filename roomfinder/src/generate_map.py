@@ -154,6 +154,19 @@ def visualize_on_map_match_properties(point, rows):
             super_market_point_wkt,
         ) = row
 
+        if not properties_name_id in properties_summary:
+            properties_summary[properties_name_id] = {
+                "name": properties_name,
+                "rent": properties_rent,
+                "latlng": wkt_to_lat_lng_list(properties_point_wkt),
+                "stations": set(),
+                "markets": set(),
+            }
+        properties_summary[properties_name_id]["stations"].add(
+            f"{stations_name}({stations_route_name})"
+        )
+        properties_summary[properties_name_id]["markets"].add(super_market_name)
+
         if not stations_id in unique_stations:
             unique_stations[stations_id] = {
                 "name": f"{stations_name}({stations_route_name})",
@@ -185,14 +198,19 @@ def visualize_on_map_match_properties(point, rows):
             icon=folium.Icon(color="orange", icon="shopping-basket", prefix="fa"),
         ).add_to(group_super_market)
 
+    for _, info in properties_summary.items():
         # 物件グループに物件を追加
-        # popup_text = f"{properties_name}<br>周辺の駅: {stations_name}, <br>周辺の店: {super_market_name}"
-        # folium.Marker(
-        #     location=wkt_to_lat_lng_list(properties_point_wkt),
-        #     popup=folium.Popup(popup_text, max_width=300),
-        #     tooltip="クリックで詳細表示",
-        #     icon=folium.Icon(color="green", icon="building", prefix="fa"),
-        # ).add_to(group_properties)
+        stations_text = ", ".join(info["stations"])
+        markets_text = ", ".join(info["markets"])
+        popup_html = (
+            f"{info['name']}<br>周辺の駅: {stations_text}<br>周辺の店: {markets_text}"
+        )
+        folium.Marker(
+            location=info["latlng"],
+            popup=folium.Popup(popup_html, max_width=300),
+            tooltip="クリックで詳細表示",
+            icon=folium.Icon(color="green", icon="building", prefix="fa"),
+        ).add_to(group_properties)
 
     # Mapインスタンスに駅・スーパーマーケット・物件グループを追加
     group_station.add_to(m)
