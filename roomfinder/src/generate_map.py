@@ -174,7 +174,7 @@ def visualize_on_map_match_properties(point, rows):
             }
 
         if not super_market_id in unique_markets:
-            unique_markets[stations_id] = {
+            unique_markets[super_market_id] = {
                 "name": super_market_name,
                 "latlng": wkt_to_lat_lng_list(super_market_point_wkt),
             }
