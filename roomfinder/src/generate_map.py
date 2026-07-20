@@ -34,17 +34,28 @@ def visualize_on_map_match_properties(point):
 
     # 駅グループを作成
     group_station = folium.FeatureGroup(name="駅")
+    # スーパーマーケットグループを作成
+    group_super_market = folium.FeatureGroup(name="スーパー")
 
     # 駅グループに駅を追加
     folium.Marker(
-        location=[33.59126, 130.39863],
-        popup=folium.Popup("天神(1号線(空港線))", max_width=300),
+        location=[33.589955, 130.379615],
+        popup=folium.Popup("大濠公園(1号線(空港線))", max_width=300),
         tooltip="クリックで詳細表示",
         icon=folium.Icon(color="red", icon="train", prefix="fa"),
     ).add_to(group_station)
 
-    # Mapインスタンスに駅グループを追加
+    # スーパーマーケットグループにスーパーを追加
+    folium.Marker(
+        location=[33.5912791, 130.3817206],
+        popup=folium.Popup("Hazama", max_width=300),
+        tooltip="クリックで詳細表示",
+        icon=folium.Icon(color="orange", icon="shopping-basket", prefix="fa"),
+    ).add_to(group_super_market)
+
+    # Mapインスタンスに駅・スーパーマーケットグループを追加
     group_station.add_to(m)
+    group_super_market.add_to(m)
 
     folium.LayerControl().add_to(m)
     # HTMLファイルを出力
