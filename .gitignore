@@ -6,6 +6,7 @@
 !/docker/
 !/docker-compose.yml
 !/roomfinder/
+!/tr_postgis
 
 # (任意) roomfinder内などの一時ファイルを除外したい場合
 **/__pycache__/
@@ -13,8 +14,12 @@
 .DS_Store
 Thumbs.db
 input_data
+memo_sql
 work
 *.csv
 *.html
+*.log
+*.txt
+.coverage
 logs
 output
