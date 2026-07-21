@@ -21,3 +21,5 @@ work
 *.log
 *.txt
 .coverage
+logs
+output
