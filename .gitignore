@@ -14,6 +14,7 @@
 .DS_Store
 Thumbs.db
 input_data
+memo_sql
 work
 *.csv
 *.html

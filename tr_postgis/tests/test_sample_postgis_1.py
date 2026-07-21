@@ -1,45 +1,387 @@
+from multiprocessing import process
+
 import pytest
 from unittest.mock import MagicMock, patch, mock_open
 import psycopg2
 import sample_postgis_1, config  # テスト対象ファイル
+from pathlib import Path
+from sample_postgis_1 import PostGISProcessor
+
+# --- テスト用定数 ---
+TEST_DB_CONFIG = {
+    "host": "localhost",
+    "database": "testdb",
+    "user": "user",
+    "password": "pass",
+}
+TEST_TARGET_POINT = (35.658, 139.745)
+TARGET_LOCATIONS = [
+    (35.658, 139.745, "東京タワー"),
+    (43.062, 141.353, "札幌市時計台"),
+    (26.217, 127.714, "首里城正殿跡"),
+]
+TEST_RADIUS = 1000
+TEST_COEFFICIENT = 0.000014
+TEST_CSV_PATH = Path("test_result.csv")
+
+
+@pytest.fixture
+def processor():
+    """PostGISProcessorの標準的なテスト用インスタンスを生成するフィクスチャ"""
+    return PostGISProcessor(
+        db_config=TEST_DB_CONFIG,
+        target_point=TEST_TARGET_POINT,
+        search_radius=TEST_RADIUS,
+        coefficient=TEST_COEFFICIENT,
+    )
 
 
 class TestPostGISApp:
 
     # --- connect_db ---
     @patch("psycopg2.connect")
-    def test_01_connect_db_success(self, mock_connect, caplog):
+    def test_01_connect_db_success(self, mock_connect, processor, caplog):
         mock_connect.return_value = MagicMock()
-        sample_postgis_1.connect_db({"db": "test"})
+        conn = processor.connect_db()
+        assert conn == processor.conn
         assert "DB接続" in caplog.text
 
     @patch("psycopg2.connect")
-    def test_02_connect_db_fail(self, mock_connect):
+    def test_02_connect_db_fail(self, mock_connect, processor):
         mock_connect.side_effect = psycopg2.OperationalError("Error")
         with pytest.raises(psycopg2.OperationalError):
-            sample_postgis_1.connect_db({"db": "test"})
+            processor.connect_db()
 
     # --- fetch_data_from_db ---
-    def test_03_fetch_success(self):
+    def test_03_fetch_success(self, processor):
         mock_conn = MagicMock()
-        mock_cur = mock_conn.cursor.return_value.__enter__.return_value
+        processor.conn = mock_conn
+        mock_cur = processor.conn.cursor.return_value.__enter__.return_value
         mock_cur.fetchall.return_value = [(1, "POINT(0 0)")]
-        rows = sample_postgis_1.fetch_data_from_db(mock_conn, "WKT", 10, 0.15)
-        assert len(rows) == 1
+        processor.fetch_data_from_db()
+        assert len(processor.fetch_rows) == 1
 
-    def test_04_fetch_empty(self):
+    def test_04_fetch_empty(self, processor):
         mock_conn = MagicMock()
-        mock_cur = mock_conn.cursor.return_value.__enter__.return_value
+        processor.conn = mock_conn
+        mock_cur = processor.conn.cursor.return_value.__enter__.return_value
         mock_cur.fetchall.return_value = []
-        rows = sample_postgis_1.fetch_data_from_db(mock_conn, "WKT", 10, 0.15)
-        assert rows == []
+        processor.fetch_data_from_db()
+        assert processor.fetch_rows == []
 
-    def test_05_fetch_sql_error(self):
+    def test_05_fetch_sql_error(self, processor):
         mock_conn = MagicMock()
-        mock_cur = mock_conn.cursor.return_value.__enter__.return_value
+        processor.conn = mock_conn
+        mock_cur = processor.conn.cursor.return_value.__enter__.return_value
         mock_cur.execute.side_effect = psycopg2.ProgrammingError("SQL Error")
         with pytest.raises(psycopg2.ProgrammingError):
-            sample_postgis_1.fetch_data_from_db(mock_conn, "WKT", 10, 0.15)
+            processor.fetch_data_from_db()
+
+    def test_26_conn_error(self, processor):
+        with pytest.raises(RuntimeError) as e:
+            processor.fetch_data_from_db()
+        assert "DB接続が確立されていません。" == str(e.value)
+
+    # --- validate_target_point ---
+    def test_14_get_point_success(self, processor):
+        processor.validate_target_point()
+        assert processor.point_wkt == f"POINT(139.745 35.658)"
+
+    def test_15_get_point_success(self, processor):
+        processor.target_point = (20.0, 154.0)
+        processor.validate_target_point()
+        assert processor.point_wkt == f"POINT(154.0 20.0)"
+
+    def test_16_get_point_lat_missing(self, processor):
+        processor.target_point = (19.999999, 139.555)
+        with pytest.raises(ValueError) as e:
+            processor.validate_target_point()
+        assert "基準点は北緯20°〜45°" in str(e.value)
+
+    def test_17_get_point_lon_missing(self, processor):
+        processor.target_point = (19.999999, 139.555)
+        with pytest.raises(ValueError) as e:
+            processor.validate_target_point()
+        assert "基準点は北緯20°〜45°" in str(e.value)
+
+    # --- validate_execution_settings ---
+    def test_20_isValidate_execution_settings_success(self, processor):
+        processor.validate_execution_settings()
+        assert processor.search_radius == 1000
+        assert processor.coefficient == 0.000014
+
+    def test_21_isValidate_execution_settings_str_success(self, processor):
+        processor.search_radius = "100"
+        processor.coefficient = "0.1"
+        processor.validate_execution_settings()
+        assert processor.search_radius == 100
+        assert isinstance(processor.search_radius, int)
+        assert processor.coefficient == 0.1
+        assert isinstance(processor.coefficient, float)
+
+    def test_22_isValidate_execution_settings_negative_missing(self, processor):
+        processor.search_radius = -100
+        with pytest.raises(ValueError) as e:
+            processor.validate_execution_settings()
+        assert "SEARCH_RADIUSは正の整数、" in str(e.value)
+
+    def test_23_isValidate_execution_settings_zero_missing(self, processor):
+        processor.coefficient = "0"
+        with pytest.raises(ValueError) as e:
+            processor.validate_execution_settings()
+        assert "COEFFICIENTは正の浮動小数で" in str(e.value)
+
+    def test_24_isValidate_execution_settings_str_missing(self, processor):
+        processor.search_radius = "str"
+        with pytest.raises(ValueError) as e:
+            processor.validate_execution_settings()
+        assert "SEARCH_RADIUSは正の整数" in str(e.value)
+
+    def test_25_isValidate_execution_settings_list_missing(self, processor):
+        processor.coefficient = [0.1]
+        with pytest.raises(ValueError) as e:
+            processor.validate_execution_settings()
+        assert "COEFFICIENTは正の浮動小数で" in str(e.value)
+
+    # --- run ---
+    @patch.object(PostGISProcessor, "connect_db")
+    @patch.object(PostGISProcessor, "fetch_data_from_db")
+    def test_08_run_success_flow(self, mock_fetch, mock_conn_func, processor):
+        # 接続オブジェクトの代わりとなるモックを作成
+        mock_conn = MagicMock()
+        # connect_dbが呼ばれたらモックを返す
+        mock_conn_func.return_value = mock_conn
+        # with構文でも同じモックを返す
+        mock_conn.__enter__.return_value = mock_conn
+        processor.conn = mock_conn
+        processor.fetch_rows = [(1, "POINT(0 0)")]
+
+        result, rows, point = processor.run()
+
+        assert result is True
+        assert rows == [(1, "POINT(0 0)")]
+        assert point == (35.658, 139.745)
+        mock_fetch.assert_called_once()
+        mock_conn.close.assert_called_once()
+
+    @patch.object(PostGISProcessor, "connect_db")
+    @patch.object(PostGISProcessor, "fetch_data_from_db")
+    def test_09_run_skip_flow(self, mock_fetch, mock_conn_func, processor, caplog):
+        mock_conn = MagicMock()
+        mock_conn_func.return_value = mock_conn
+        mock_conn.__enter__.return_value = mock_conn
+        processor.conn = mock_conn
+        processor.fetch_rows = []  # 0件
+
+        result, row, point = processor.run()
+
+        assert result is True
+        assert row == []
+        assert point == (35.658, 139.745)
+        mock_fetch.assert_called_once()
+        mock_conn.close.assert_called_once()
+
+    @patch.object(PostGISProcessor, "connect_db")
+    @patch.object(PostGISProcessor, "fetch_data_from_db")
+    def test_10_run_op_error(self, mock_fetch, mock_conn_func, processor, caplog):
+        mock_conn_func.side_effect = psycopg2.OperationalError("Conn Fail")
+
+        result, row, point = processor.run()
+        assert result is False
+        assert row == []
+        assert point == (35.658, 139.745)
+        assert "【DB接続エラー】" in caplog.text
+        mock_fetch.assert_not_called()
+
+    @patch.object(PostGISProcessor, "connect_db")
+    @patch.object(PostGISProcessor, "fetch_data_from_db")
+    def test_11_run_prog_error(self, mock_fetch, mock_conn_func, processor, caplog):
+        mock_conn = MagicMock()
+        mock_conn_func.return_value = mock_conn
+        mock_conn.__enter__.return_value = mock_conn
+        processor.conn = mock_conn
+        mock_fetch.side_effect = psycopg2.ProgrammingError("SQL Fail")
+
+        result, row, point = processor.run()
+
+        assert result is False
+        assert row == []
+        assert point == (35.658, 139.745)
+        assert "【SQL実行エラー】" in caplog.text
+        mock_conn.close.assert_called_once()
+
+    @patch.object(PostGISProcessor, "connect_db")
+    @patch.object(PostGISProcessor, "fetch_data_from_db")
+    def test_12_run_generic_db_error(
+        self, mock_fetch, mock_conn_func, processor, caplog
+    ):
+        mock_conn = MagicMock()
+        mock_conn_func.return_value = mock_conn
+        mock_conn.__enter__.return_value = mock_conn
+        processor.conn = mock_conn
+        mock_fetch.side_effect = psycopg2.Error("Generic Fail")
+        result, row, point = processor.run()
+
+        assert result is False
+        assert row == []
+        assert point == (35.658, 139.745)
+        assert "【その他DBエラー】" in caplog.text
+        mock_conn.close.assert_called_once()
+
+    @patch.object(PostGISProcessor, "connect_db")
+    @patch.object(PostGISProcessor, "fetch_data_from_db")
+    def test_13_run_value_error(self, mock_fetch, mock_conn_func, processor, caplog):
+        processor.target_point = (19.999999, 139.555)
+        result, row, point = processor.run()
+
+        assert result is False
+        assert row == []
+        assert point == (19.999999, 139.555)
+        assert "【設定値エラー】" in caplog.text
+        mock_conn_func.assert_not_called()
+        mock_fetch.assert_not_called()
+
+    # --- main (フロー制御) ---
+    @patch(
+        "sample_postgis_1.TARGET_LOCATIONS",
+        [(35.0, 139.0, "地点A"), (36.0, 140.0, "地点B"), (37.0, 141.0, "地点C")],
+    )
+    @patch("config.get_db_config", return_value={"db": "test"})
+    @patch.object(PostGISProcessor, "run")
+    @patch("sample_postgis_1.save_to_csv")
+    def test_27_main_success(self, mock_save, mock_run, _, caplog):
+        mock_run.side_effect = [
+            (True, [(1, "geom1")], (35.0, 139.0)),
+            (True, [(2, "geom2"), (3, "geom3")], (36.0, 140.0)),
+            (True, [(4, "geom"), (5, "geom5"), (6, "geom6")], (37.0, 141.0)),
+        ]
+        mock_save.return_value
+        sample_postgis_1.main()
+
+        args, _ = mock_save.call_args
+        all_rows = args[1]  # 第1引数はcsvのパス、第2引数が結果のリスト
+        assert len(all_rows) == 6
+
+        assert "---- 正常終了 ----" in caplog.text
+        mock_save.assert_called_once()
+
+    @patch(
+        "sample_postgis_1.TARGET_LOCATIONS",
+        [(35.0, 139.0, "地点A"), (36.0, 140.0, "地点B"), (37.0, 141.0, "地点C")],
+    )
+    @patch("config.get_db_config", return_value={"db": "test"})
+    @patch.object(PostGISProcessor, "run")
+    @patch("sample_postgis_1.save_to_csv")
+    def test_28_main_success_no_results(self, mock_save, mock_run, _, caplog):
+        mock_run.side_effect = [
+            (True, [(1, "geom1")], (35.0, 139.0)),
+            (True, [(2, "geom2"), (3, "geom3")], (36.0, 140.0)),
+            (True, [], (37.0, 141.0)),
+        ]
+        sample_postgis_1.main()
+
+        args, _ = mock_save.call_args
+        all_rows = args[1]  # 第1引数はcsvのパス、第2引数が結果のリスト
+        assert len(all_rows) == 3
+
+        assert "---- 正常終了 ----" in caplog.text
+        mock_save.assert_called_once()
+
+    @patch(
+        "sample_postgis_1.TARGET_LOCATIONS",
+        [(35.0, 139.0, "地点A"), (36.0, 140.0, "地点B"), (37.0, 141.0, "地点C")],
+    )
+    @patch("config.get_db_config", return_value={"db": "test"})
+    @patch.object(PostGISProcessor, "run")
+    @patch("sample_postgis_1.save_to_csv")
+    def test_29_main_no_result(self, mock_save, mock_run, _, caplog):
+        mock_run.side_effect = [
+            (True, [], (35.0, 139.0)),
+            (True, [], (36.0, 140.0)),
+            (True, [], (37.0, 141.0)),
+        ]
+        sample_postgis_1.main()
+
+        assert "取得結果が0件のためCSVファイルの出力をスキップ" in caplog.text
+        assert "---- 正常終了 ----" in caplog.text
+        mock_save.assert_not_called()
+
+    @patch(
+        "sample_postgis_1.TARGET_LOCATIONS",
+        [(35.0, 139.0, "地点A"), (36.0, 140.0, "地点B"), (37.0, 141.0, "地点C")],
+    )
+    @patch("config.get_db_config", return_value={"db": "test"})
+    @patch.object(PostGISProcessor, "run")
+    @patch("sample_postgis_1.save_to_csv")
+    def test_30_main_partial_fail(self, mock_save, mock_run, _, caplog):
+        mock_run.side_effect = [
+            (True, [(1, "geom1")], (35.0, 139.0)),
+            (True, [(2, "geom2"), (3, "geom3")], (36.0, 140.0)),
+            (False, [], (37.0, 141.0)),
+        ]
+
+        sample_postgis_1.main()
+
+        args, _ = mock_save.call_args
+        all_rows = args[1]  # 第1引数はcsvのパス、第2引数が結果のリスト
+        assert len(all_rows) == 3
+
+        mock_save.assert_called_once()
+        assert "---- 異常終了 ----" in caplog.text
+        mock_save.assert_called_once()
+
+    @patch(
+        "sample_postgis_1.TARGET_LOCATIONS",
+        [(35.0, 139.0, "地点A"), (36.0, 140.0, "地点B"), (37.0, 141.0, "地点C")],
+    )
+    @patch("config.get_db_config", return_value={"db": "test"})
+    @patch.object(PostGISProcessor, "run")
+    @patch("sample_postgis_1.save_to_csv")
+    def test_31_main_fail(self, mock_save, mock_run, _, caplog):
+        mock_run.side_effect = [
+            (False, [], (35.0, 139.0)),
+            (False, [], (36.0, 140.0)),
+            (False, [], (37.0, 141.0)),
+        ]
+        sample_postgis_1.main()
+
+        assert "---- 異常終了 ----" in caplog.text
+        mock_save.assert_not_called()
+
+    # --- fetch_data_from_db（境界値テスト） ---
+    def test_18_fetch_data_from_db_boundary_value(self, processor):
+        """
+        クエリの境界値をテスト
+        テスト用のDBでクエリを実行すると3件、id=1,2,3のものが取得できることを確認
+        """
+        db_config = config.get_db_config()
+        db_config["database"] = "gis_tr_db_test"
+        processor.db_config = db_config
+        processor.point_wkt = "POINT(139.745 35.658)"
+        processor.search_radius = 1000
+        processor.coefficient = 0.000014
+        processor.connect_db()
+        processor.fetch_data_from_db()
+        assert len(processor.fetch_rows) == 3
+        actual_ids = [row[0] for row in processor.fetch_rows]
+        assert set(actual_ids) == {1, 2, 3}
+
+    def test_19_fetch_data_from_db_execute_setting_value(self, processor):
+        """
+        クエリのパラメータとなる設定値を変更した場合、取得結果が変わることを確認
+        テスト用のDBでクエリを実行すると1件、id=1のものが取得できることを確認
+        """
+        db_config = config.get_db_config()
+        db_config["database"] = "gis_tr_db_test"
+        processor.db_config = db_config
+        processor.point_wkt = "POINT(139.745 35.658)"
+        processor.search_radius = 500.1
+        processor.coefficient = 0.000014
+        processor.connect_db()
+        processor.fetch_data_from_db()
+        assert len(processor.fetch_rows) == 1
+        actual_ids = [row[0] for row in processor.fetch_rows]
+        assert set(actual_ids) == {1}
 
     # --- save_to_csv ---
     @patch("builtins.open", new_callable=mock_open)
@@ -47,166 +389,3 @@ class TestPostGISApp:
         sample_postgis_1.save_to_csv("path.csv", [[1, "geom"]])
         mock_file.assert_called_once()
         assert "1件 のデータをファイルに書き込みました。" in caplog.text
-
-    # --- validate_target_point ---
-    def test_14_get_point_success(self):
-        target_point = sample_postgis_1.validate_target_point((35.555, 139.555))
-        assert target_point == f"POINT(139.555 35.555)"
-
-    def test_15_get_point_success(self):
-        target_point = sample_postgis_1.validate_target_point((20.0, 154.0))
-        assert target_point == f"POINT(154.0 20.0)"
-
-    def test_16_get_point_lat_missing(self, caplog):
-        with pytest.raises(SystemExit) as e:
-            sample_postgis_1.validate_target_point((19.999999, 139.555))
-        assert "【設定値エラー】" in caplog.text
-        assert e.value.code == 1
-
-    def test_17_get_point_lon_missing(self, caplog):
-        with pytest.raises(SystemExit) as e:
-            sample_postgis_1.validate_target_point((35.555, 154.000001))
-        assert "【設定値エラー】" in caplog.text
-        assert e.value.code == 1
-
-    # --- validate_execution_settings ---
-    def test_20_isValidate_execution_settings_success(self):
-        raw_radius = 100
-        raw_coefficient = 0.1
-        radius, coefficient = sample_postgis_1.validate_execution_settings(
-            raw_radius, raw_coefficient
-        )
-        assert radius == raw_radius
-        assert coefficient == raw_coefficient
-
-    def test_21_isValidate_execution_settings_str_success(self):
-        raw_radius = "100"
-        raw_coefficient = "0.1"
-        radius, coefficient = sample_postgis_1.validate_execution_settings(
-            raw_radius, raw_coefficient
-        )
-        assert radius == 100
-        assert isinstance(radius, int)
-        assert coefficient == 0.1
-        assert isinstance(coefficient, float)
-
-    def test_22_isValidate_execution_settings_negative_missing(self, caplog):
-        raw_radius = -100
-        raw_coefficient = 0.1
-        with pytest.raises(SystemExit) as e:
-            sample_postgis_1.validate_execution_settings(raw_radius, raw_coefficient)
-        assert e.value.code == 1
-        assert "【設定値エラー】" in caplog.text
-
-    def test_22_isValidate_execution_settings_zero_missing(self, caplog):
-        raw_radius = 100
-        raw_coefficient = "0"
-        with pytest.raises(SystemExit) as e:
-            sample_postgis_1.validate_execution_settings(raw_radius, raw_coefficient)
-        assert e.value.code == 1
-        assert "【設定値エラー】" in caplog.text
-
-    def test_23_isValidate_execution_settings_str_missing(self, caplog):
-        raw_radius = "st"
-        raw_coefficient = 0.1
-        with pytest.raises(SystemExit) as e:
-            sample_postgis_1.validate_execution_settings(raw_radius, raw_coefficient)
-        assert e.value.code == 1
-        assert "【設定値エラー】" in caplog.text
-
-    def test_24_isValidate_execution_settings_list_missing(self, caplog):
-        raw_radius = 10
-        raw_coefficient = [0.1]
-        with pytest.raises(SystemExit) as e:
-            sample_postgis_1.validate_execution_settings(raw_radius, raw_coefficient)
-        assert e.value.code == 1
-        assert "【設定値エラー】" in caplog.text
-
-    # --- main (フロー制御) ---
-    @patch("sample_postgis_1.config.get_db_config", return_value={})
-    @patch("sample_postgis_1.connect_db")
-    @patch("sample_postgis_1.fetch_data_from_db")
-    @patch("sample_postgis_1.save_to_csv")
-    def test_08_main_success_flow(self, mock_save, mock_fetch, mock_conn_func, _):
-        mock_conn = MagicMock()
-        mock_conn_func.return_value.__enter__.return_value = mock_conn
-        mock_fetch.return_value = [(1, "geom")]
-        sample_postgis_1.main()
-        mock_save.assert_called_once()
-        mock_conn.close.assert_called_once()
-
-    @patch("sample_postgis_1.config.get_db_config", return_value={})
-    @patch("sample_postgis_1.connect_db")
-    @patch("sample_postgis_1.fetch_data_from_db")
-    @patch("sample_postgis_1.save_to_csv")
-    def test_09_main_skip_flow(self, mock_save, mock_fetch, mock_conn_func, _, caplog):
-        mock_conn = MagicMock()
-        mock_conn_func.return_value.__enter__.return_value = mock_conn
-        mock_fetch.return_value = []  # 0件
-        sample_postgis_1.main()
-        mock_save.assert_not_called()
-        assert "取得結果が0件のためCSVファイルの出力をスキップ" in caplog.text
-
-    @patch("sample_postgis_1.config.get_db_config", return_value={})
-    @patch("sample_postgis_1.connect_db")
-    def test_10_main_op_error(self, mock_conn_func, _, caplog):
-        mock_conn_func.side_effect = psycopg2.OperationalError("Conn Fail")
-        sample_postgis_1.main()
-        assert "【DB接続エラー】" in caplog.text
-
-    @patch("sample_postgis_1.config.get_db_config", return_value={})
-    @patch("sample_postgis_1.connect_db")
-    @patch("sample_postgis_1.fetch_data_from_db")
-    def test_11_main_prog_error(self, mock_fetch, mock_conn_func, _, caplog):
-        mock_conn = MagicMock()
-        mock_conn_func.return_value.__enter__.return_value = mock_conn
-        mock_fetch.side_effect = psycopg2.ProgrammingError("SQL Fail")
-        sample_postgis_1.main()
-        assert "【SQL実行エラー】" in caplog.text
-
-    @patch("sample_postgis_1.config.get_db_config", return_value={})
-    @patch("sample_postgis_1.connect_db")
-    @patch("sample_postgis_1.fetch_data_from_db")
-    def test_12_main_generic_db_error(self, mock_fetch, mock_conn_func, _, caplog):
-        mock_conn = MagicMock()
-        mock_conn_func.return_value.__enter__.return_value = mock_conn
-        mock_fetch.side_effect = psycopg2.Error("Generic Fail")
-        sample_postgis_1.main()
-        assert "【その他DBエラー】" in caplog.text
-
-    @patch("sample_postgis_1.config.get_db_config", return_value={})
-    @patch("sample_postgis_1.connect_db")
-    def test_13_main_finally_close(self, mock_conn_func, _):
-        mock_conn = MagicMock()
-        mock_conn_func.return_value.__enter__.return_value = mock_conn
-        sample_postgis_1.main()
-        mock_conn.close.assert_called()
-
-    # --- fetch_data_from_db（境界値テスト） ---
-    def test_18_fetch_data_from_db_boundary_value(self):
-        """
-        クエリの境界値をテスト
-        テスト用のDBでクエリを実行すると3件、id=1,2,3のものが取得できることを確認
-        """
-        db_config = config.get_db_config()
-        db_config["database"] = "gis_tr_db_test"
-        conn = sample_postgis_1.connect_db(db_config)
-        point_wkt = sample_postgis_1.validate_target_point((35.658, 139.745))
-        rows = sample_postgis_1.fetch_data_from_db(conn, point_wkt, 1000, 0.000015)
-        assert len(rows) == 3
-        actual_ids = [row[0] for row in rows]
-        assert set(actual_ids) == {1, 2, 3}
-
-    def test_19_fetch_data_from_db_execute_setting_value(self):
-        """
-        クエリのパラメータとなる設定値を変更した場合、取得結果が変わることを確認
-        テスト用のDBでクエリを実行すると1件、id=1のものが取得できることを確認
-        """
-        db_config = config.get_db_config()
-        db_config["database"] = "gis_tr_db_test"
-        conn = sample_postgis_1.connect_db(db_config)
-        point_wkt = sample_postgis_1.validate_target_point((35.658, 139.745))
-        rows = sample_postgis_1.fetch_data_from_db(conn, point_wkt, 500.1, 0.000014)
-        assert len(rows) == 1
-        actual_ids = [row[0] for row in rows]
-        assert set(actual_ids) == {1}
