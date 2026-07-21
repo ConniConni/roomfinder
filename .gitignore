@@ -16,3 +16,5 @@ input_data
 work
 *.csv
 *.html
+logs
+output
