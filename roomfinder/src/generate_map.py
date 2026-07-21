@@ -1,8 +1,15 @@
 import folium
+import logging
+import psycopg2
+from pathlib import Path
 from shapely import wkt, get_coordinates
 
+
+import config
+
+# --- 定数 ---
 target_point = (33.591472, 130.402333)  # アクロス
-file_name = "map_output.html"
+file_name = Path(__file__).parent.parent / "output" / "map_output.html"
 
 # visualize_on_map_match_properties()のロジック確認用のリスト
 test_properties_data = [
@@ -91,6 +98,64 @@ test_properties_data = [
         "POINT(130.392 33.589)",
     ),
 ]
+# --- ロギング設定 ---
+config.setup_logging()
+logger = logging.getLogger(__name__)
+
+
+# --- 関数定義 ---
+def connect_db(db_config):
+    """
+    DBへの接続を確立する
+
+    args:
+        db_config (dict): DB接続情報
+
+    return:
+        conn (object): 接続オブジェクト
+    """
+
+    conn = psycopg2.connect(**db_config)
+
+    if conn:
+        logger.info("DB接続")
+    return conn
+
+
+def fetch_data_from_db(conn):
+    """
+    クエリを実行してデータを取得する
+
+    args:
+        conn (object): 接続オブジェクト
+
+    return:
+        rows (list): クエリの実行結果
+    """
+    # 取得したデータの保存先を定義
+    rows = []
+
+    # 実行するSQL
+    sql = """
+        SELECT
+            prop.id, prop.name, prop.rent, ST_AsText(prop.geom),
+            sta.id, sta.name, sta.line_name, ST_AsText(sta.geom),
+            mkt.id, mkt.name, ST_AsText(mkt.geom)
+        FROM properties As prop
+        INNER JOIN railway_stations As sta
+            ON ST_Dwithin(prop.geom, sta.geom, 0.014)
+            AND ST_Dwithin(ST_Transform(prop.geom, 6670), ST_Transform(sta.geom, 6670), 1000)
+        INNER JOIN supermarkets As mkt
+            ON ST_Dwithin(prop.geom, mkt.geom, 0.014)
+            AND ST_Dwithin(ST_Transform(prop.geom, 6670), ST_Transform(mkt.geom, 6670),1000);
+    """
+
+    with conn.cursor() as cur:
+        cur.execute(sql)
+        logger.debug(sql)
+        rows = cur.fetchall()
+
+    return rows
 
 
 def wkt_to_lat_lng_list(point_wkt):
@@ -222,4 +287,43 @@ def visualize_on_map_match_properties(point, rows):
     m.save(file_name)
 
 
-visualize_on_map_match_properties(target_point, test_properties_data)
+# --- メイン処理 ---
+def main():
+    # DB接続情報を取得
+    db_config = config.get_db_config()
+
+    # 正常終了時は自動でcommit
+    # エラー発生時は自動でrollback（その後except句の処理）
+    # with句を抜けたら自動でカーソルを閉じる
+    try:
+        conn = None  # 初期化
+        # DB接続
+        with connect_db(db_config) as conn:
+            # データ取得
+            fetch_rows = fetch_data_from_db(conn)
+            logger.info(f"取得結果: {len(fetch_rows)}件")
+
+        # 1件以上のデータが取れているか確認
+        if not fetch_rows:
+            logger.info("取得結果が0件のためHTMLの出力をスキップ")
+            return
+        # 取得したデータが1件以上の場合、CSVに出力
+        visualize_on_map_match_properties(target_point, fetch_rows)
+
+    except psycopg2.OperationalError as e:
+        logger.error(f"【DB接続エラー】設定を見直してください。:{e}")
+
+    except psycopg2.ProgrammingError as e:
+        logger.error(f"【SQL実行エラー】クエリの内容を確認してください。:{e}")
+
+    except psycopg2.Error as e:
+        logger.error(f"【その他DBエラー】:{e}")
+
+    finally:
+        if conn:
+            conn.close()
+            logger.info("DB切断")
+
+
+if __name__ == "__main__":
+    main()
