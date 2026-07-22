@@ -36,3 +36,45 @@
 - 各クエリの結果件数と、全体の平均処理時間を表示してください。
 
 ---
+
+### 2. 方針
+
+対応は以下の３つに分ける
+
+- A. データベース設計
+- B. 大量データ生成と高速インサート
+- C~E. 検索ロジック（PostGIS最適化） / マルチスレッドによる負荷シミュレーション / パフォーマンス分析
+
+---
+
+### 3. 設計
+
+#### 3-1. データベース設計
+
+- CREATE TABLEでデータベースを作成
+- テーブル名はstores
+- NULLは許可しない
+- カラムの条件
+  - `id`: シリアル型（主キー）
+  - `name`: 文字列（店舗名）
+  - `category`: 文字列（カテゴリ：`restaurant`, `cafe`, `market`, `Bakery`, `Bar`, `C-store`）
+  - `geom`: `GEOMETRY(Point, 4326)` 型
+  - **必須:** `geom` カラムに GIST インデックスを貼ること。
+
+```sql
+CREATE TABLE stores (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    category VARCHAR(255) NOT NULL CHECK (category IN ('restaurant', 'cafe', 'market', 'Bakery', 'Bar', 'C-store')),
+    geom GEOMETRY(Point, 4326) NOT NULL
+);
+```
+
+- カテゴリを追加する場合
+
+```
+-- 1. 古いチェック制約を削除
+ALTER TABLE stores DROP CONSTRAINT store_category_check;
+-- 2. 新しいカテゴリ(`Set-Meal-shop`)を追加した制約を再設定
+ALTER TABLE sotre ADD CONSTRAINT sotres_category_check CHECK (category IN ('Restaurant', 'Cafe', 'Market', 'Bakery', 'Bar', 'C-store', 'Set-Meal-shop'));
+```
