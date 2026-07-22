@@ -7,6 +7,7 @@
 !/docker-compose.yml
 !/roomfinder/
 !/tr_postgis
+!/review_tr_postgis
 
 # (任意) roomfinder内などの一時ファイルを除外したい場合
 **/__pycache__/
