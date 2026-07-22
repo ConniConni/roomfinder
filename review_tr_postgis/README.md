@@ -68,13 +68,27 @@ CREATE TABLE stores (
     category VARCHAR(255) NOT NULL CHECK (category IN ('restaurant', 'cafe', 'market', 'Bakery', 'Bar', 'C-store')),
     geom GEOMETRY(Point, 4326) NOT NULL
 );
+CREATE INDEX idx_stores_geom ON stores USING GIST(geom);
 ```
 
 - カテゴリを追加する場合
 
-```
+```sql
 -- 1. 古いチェック制約を削除
-ALTER TABLE stores DROP CONSTRAINT store_category_check;
+ALTER TABLE stores DROP CONSTRAINT stores_category_check;
 -- 2. 新しいカテゴリ(`Set-Meal-shop`)を追加した制約を再設定
-ALTER TABLE sotre ADD CONSTRAINT sotres_category_check CHECK (category IN ('Restaurant', 'Cafe', 'Market', 'Bakery', 'Bar', 'C-store', 'Set-Meal-shop'));
+ALTER TABLE stores ADD CONSTRAINT stores_category_check CHECK (category IN ('Restaurant', 'Cafe', 'Market', 'Bakery', 'Bar', 'C-store', 'Set-Meal-shop'));
 ```
+
+- インデックスを削除する場合(INSERT前に削除した方が高速なため)
+
+```sql
+-- 1. インデックスの削除
+DROP INDEX IF EXISTS idx_stores_geom;
+
+-- 2. インデックスの追加と統計情報の更新
+CREATE INDEX idx_stores_geom ON stores USING GIST(geom);
+ANALYZE stores;
+```
+
+---
