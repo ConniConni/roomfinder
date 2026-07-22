@@ -92,3 +92,40 @@ ANALYZE stores;
 ```
 
 ---
+
+#### 3-2. 大量データ生成と高速インサート
+
+##### 要件の理解
+
+- **要件:** 1件ずつ `INSERT` するのではなく、`psycopg2` の `execute_values` や `copy_from` 等を使用して、**バルクインサート**を実装してください。
+  - `python` の `psycopg2` モジュールを利用する形はNW通信の分時間がかかるので `INSERT INTO stores (id ,name, category, geom) SELECT ...略...;` の形にする
+  - idはSELECTで取得し、その後にserialを更新
+  - nameは店舗名のパーツを配列で定義してランダムで作成
+    - 接頭辞リスト: ['ミント', 'ハッピー', 'サンライズ', 'ゴールデン', 'ラッキー', 'スペシャル', '気まぐれ', '毎日', '爽やか', 'everyday']
+    - 接尾辞リスト: ['レストラン', 'カフェ', 'スーパー', 'ベーカリー', '居酒屋', 'コンビニ', '定食']
+- インサートにかかった時間を計測し、表示してください。
+  - DO文(`DO $$ END $$`)を使って時間を計測する
+
+```sql
+DO $$
+DECLARE
+    prefixes TEXT[] := ARRAY['ミント', 'ハッピー', 'サンライズ', 'ゴールデン', 'ラッキー', 'スペシャル', '気まぐれ', '毎日', '爽やか', 'everyday'];
+    suffixes TEXT[] := ARRAY['レストラン', 'カフェ', 'スーパー', 'ベーカリー', '居酒屋', 'コンビニ'];
+    categories TEXT[] := ARRAY['restaurant', 'cafe', 'market', 'Bakery', 'Bar', 'C-store'];
+    start_time TIMESTAMP := clock_timestamp();
+
+BEGIN
+    INSERT INTO stores (id, name, category)
+    SELECT
+        s AS id,
+        prefixes[floor(random() * 10 + 1)] || suffixes[suffix_idx] AS name,
+        categories[suffix_idx] AS category
+    FROM (
+        SELECT
+            s,
+            floor(random() * 7 + 1)::int AS suffix_idx
+        FROM generate_series(1,3) AS s
+    );
+    RAISE NOTICE 'actual time: %', clock_timestamp() - start_time;
+END $$;
+```
