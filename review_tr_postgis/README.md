@@ -89,6 +89,9 @@ DROP INDEX IF EXISTS idx_stores_geom;
 -- 2. インデックスの追加と統計情報の更新
 CREATE INDEX idx_stores_geom ON stores USING GIST(geom);
 ANALYZE stores;
+
+-- 3. idカラムのSERIALが1のままなので更新
+SELECT setval(pg_get_serial_sequence('stores', 'id'), COALESCE(max(id), 1)) FROM stores;
 ```
 
 ---
@@ -103,29 +106,63 @@ ANALYZE stores;
   - nameは店舗名のパーツを配列で定義してランダムで作成
     - 接頭辞リスト: ['ミント', 'ハッピー', 'サンライズ', 'ゴールデン', 'ラッキー', 'スペシャル', '気まぐれ', '毎日', '爽やか', 'everyday']
     - 接尾辞リスト: ['レストラン', 'カフェ', 'スーパー', 'ベーカリー', '居酒屋', 'コンビニ', '定食']
+    - この組み合わせでは`10 × 6 = 60`通りしか表現できないため、ユニークな名称にするために`id + 号店`という文字列を後ろに加える
+  - geomはデータが陸上に指定されるように、以下の都市の付近で傾斜をつけて生成する
+    - 1. 都市の代表点を決める
+    - 2. ランダムで地点を生成する範囲を決める
+    - 3. 都市ごとのデータの傾斜を決める
+      - 1. 川越(埼玉県)(35.92, 139.48), 奈良(奈良県)(34.68 ,135.99), 岐阜(岐阜県)(35.41, 136.76), 富良野(北海道)(43.30, 142.42), 日田(大分県)(33.32, 130.94)
+      - 2. 半径40km 緯度: `80km / 111km(緯度1度) ≒ 0.7` 経度: `80km / 91km(北緯35度付近の経度1度) ≒ 0.9`
+      - 3. 川越 50%, 奈良 20%, 岐阜 10%, 富良野 10%, 日田 10%
+
 - インサートにかかった時間を計測し、表示してください。
   - DO文(`DO $$ END $$`)を使って時間を計測する
+  - 追加で100万件までは性能が劣化しないことを確認した
+
+- SERIALを使っていないため、idカラムのSERIALを更新した場合は、テーブル削除の際に`RESTART IDENTITY`をつける
+  ```
+  TRUNCATE TABLE stores RESTART IDENTITY;
+  ```
 
 ```sql
 DO $$
 DECLARE
+    total_records INT := 1000000; -- 生成するデータ数を指定
     prefixes TEXT[] := ARRAY['ミント', 'ハッピー', 'サンライズ', 'ゴールデン', 'ラッキー', 'スペシャル', '気まぐれ', '毎日', '爽やか', 'everyday'];
     suffixes TEXT[] := ARRAY['レストラン', 'カフェ', 'スーパー', 'ベーカリー', '居酒屋', 'コンビニ'];
     categories TEXT[] := ARRAY['restaurant', 'cafe', 'market', 'Bakery', 'Bar', 'C-store'];
+    base_longitudes DOUBLE PRECISION[] := ARRAY[139.48, 135.99, 136.76, 142.42, 130.94];
+    base_base_latitudes DOUBLE PRECISION[] := ARRAY[35.92, 34.68 , 35.41, 43.30, 33.32];
     start_time TIMESTAMP := clock_timestamp();
 
 BEGIN
-    INSERT INTO stores (id, name, category)
+    INSERT INTO stores (id, name, category, geom)
     SELECT
         s AS id,
-        prefixes[floor(random() * 10 + 1)] || suffixes[suffix_idx] AS name,
-        categories[suffix_idx] AS category
+        prefixes[prefixes_idx] || suffixes[suffix_idx] || ' ' || s || '号店' AS name,
+        categories[suffix_idx] AS category,
+        ST_SetSRID(ST_MakePoint(base_longitudes[city_idx] + (random() - 0.5) * 0.9,  base_base_latitudes[city_idx] + (random() - 0.5) * 0.7), 4326) AS geom -- 80kmは経度は0.9度, 緯度は0.7度
     FROM (
         SELECT
             s,
-            floor(random() * 7 + 1)::int AS suffix_idx
-        FROM generate_series(1,3) AS s
-    );
+            prefixes_idx,
+            suffix_idx,
+            CASE
+                WHEN prefixes_idx <= 5 THEN 1
+                WHEN prefixes_idx <= 7 THEN 2
+                WHEN prefixes_idx = 8 THEN 3
+                WHEN prefixes_idx = 9 THEN 4
+                ELSE 5
+            END AS city_idx
+        FROM (
+            SELECT
+                s,
+                floor(random() * 10 + 1)::int AS prefixes_idx,
+                floor(random() * 6 + 1)::int AS suffix_idx
+            FROM generate_series(1,total_records) AS s) AS random_indexes
+    ) AS store_source;
     RAISE NOTICE 'actual time: %', clock_timestamp() - start_time;
 END $$;
 ```
+
+---
