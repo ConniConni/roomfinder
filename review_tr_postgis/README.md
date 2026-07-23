@@ -137,12 +137,7 @@ DECLARE
 
 BEGIN
     INSERT INTO stores (id, name, category, geom)
-    SELECT
-        s AS id,
-        prefixes[prefixes_idx] || suffixes[suffix_idx] || ' ' || s || '号店' AS name,
-        categories[suffix_idx] AS category,
-        ST_SetSRID(ST_MakePoint(base_longitudes[city_idx] + (random() - 0.5) * 0.9,  base_base_latitudes[city_idx] + (random() - 0.5) * 0.7), 4326) AS geom -- 80kmは経度は0.9度, 緯度は0.7度
-    FROM (
+    WITH store_source AS (
         SELECT
             s,
             prefixes_idx,
@@ -160,7 +155,14 @@ BEGIN
                 floor(random() * 10 + 1)::int AS prefixes_idx,
                 floor(random() * 6 + 1)::int AS suffix_idx
             FROM generate_series(1,total_records) AS s) AS random_indexes
-    ) AS store_source;
+    )
+    SELECT
+        s AS id,
+        prefixes[prefixes_idx] || suffixes[suffix_idx] || ' ' || s || '号店' AS name,
+        categories[suffix_idx] AS category,
+        ST_SetSRID(ST_MakePoint(base_longitudes[city_idx] + (random() - 0.5) * 0.9,  base_base_latitudes[city_idx] + (random() - 0.5) * 0.7), 4326) AS geom -- 80kmは経度は0.9度, 緯度は0.7度
+    FROM store_source;
+
     RAISE NOTICE 'actual time: %', clock_timestamp() - start_time;
 END $$;
 ```
