@@ -168,3 +168,26 @@ END $$;
 ```
 
 ---
+
+#### 3-3. 検索ロジック（PostGIS最適化） / マルチスレッドによる負荷シミュレーショ / パフォーマンス分析
+
+##### 要件の理解 ---- 検索ロジック（PostGIS最適化） ----
+
+- 特定の座標から半径 `N` メートル以内の店舗を検索する関数を作成します。
+- **要件:** `ST_Expand` と `&&` 演算子（バウンディングボックス検索）を組み合わせて、インデックスを確実に活用するクエリを書くこと。
+
+- クエリ検討
+  - 取得するカラムはid, name, category, geom
+  - ここでは仮の地点(東京都新宿区 (35.92, 139.48))と仮の距離(1000m)でクエリを作成
+  - インデックスを使うために特定の座標から少し大きめの範囲(1.5倍程度)のgeometryを取得 ST_Expand()
+  - 取得したgeometryに対してBBOXを使って絞り込みを行う geom $$ ST_Expand()
+  - 絞り込んだ上で正確にメートルで絞り込み ST_Dwithin()
+
+```sql
+SELECT
+    id, name, category, ST_AsText(geom)
+FROM stores
+WHERE geom && ST_Expand(ST_SetSRID(ST_MakePoint(139.48,35.92),4326), 0.014) -- 東京都新宿区から約1.55kmにある地点を絞り込み
+AND ST_DWithin(ST_SetSRID(ST_MakePoint(139.48,35.92),4326)::geography, geom::geography, 1000) -- 1000m以内の地点を正確に計算
+;
+```
