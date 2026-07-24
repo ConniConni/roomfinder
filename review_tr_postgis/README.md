@@ -334,3 +334,49 @@ flowchart TD
       - `host`,`port`, `database`, `user`, `pass`
   - OUTPUT:
     - 整形した辞書
+
+- 3-3-3-4. スレッド(データ取得クラス)
+  - 概要:
+    - DBから対象のデータを取得する
+    - 呼び出し元での管理のためにリストの他に成功フラグと対象の地点を返す
+
+  - クラス名:
+    - `ParallelDataFetcher`
+  - インスタンス変数:
+    - `db_config` (DB接続情報)
+    - `target_point` (基準点)
+    - `search_radius` (検索半径)
+    - `padding_factor` (検索距離(度))
+    - `max_workers` (スレッド数)
+    - `conn` (DB接続オブジェクト) 初期値 `None`
+    - `__init__()`で初期化
+  - クラスメソッド:
+    - 関数名:
+      - `connect()`
+        - INPUT:
+          - なし
+        - PROCESS:
+          - `pyscopg2`ライブラリ`connect`メソッドで接続を確保
+        - OUTPUT:
+          - `conn`オブジェクト
+
+    - 関数名:
+      - `fetch_list()`
+        - INPUT:
+          - DB接続オブジェクト
+        - PROCESS:
+          - `sql`組み立て
+          - sql実行
+          - データ取得
+        - OUTPUT:
+          - `is_success` / `fetch_date`/ `targe_point` (成功フラグ / 実行結果 / 対象地点 )
+    - 関数名:
+      - `run()`
+        - INPUT:
+          - なし
+        - PROCESS:
+          - なし
+        - OUTPUT:
+          - 成功フラグ
+          - 取得結果
+          - 対象地点
