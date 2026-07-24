@@ -319,3 +319,18 @@ flowchart TD
       - 上記を満たさない場合はメッセージを表示しツール終了
   - OUTPUT:
     - なし
+
+- 3-3-3-3. DB接続情報取得
+  - 概要:
+    - .envファイルの環境変数を読み込み辞書型に整形し返す
+    - .envの読み込みには`dotenv`モジュールの`load_dotenv()`を使用
+    - 読み込んだ値は`os`モジュールの`get_env()`で取得
+  - 関数名:
+    - `get_db_config()`
+  - INPUT:
+    - なし
+  - PROCESS:
+    - 以下のキーで値を保持
+      - `host`,`port`, `database`, `user`, `pass`
+  - OUTPUT:
+    - 整形した辞書
