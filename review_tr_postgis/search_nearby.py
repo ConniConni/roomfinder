@@ -1,4 +1,5 @@
 import logging
+import sys
 from pathlib import Path
 from datetime import datetime
 
@@ -73,6 +74,46 @@ def validate_params():
     return:
         なし
     """
+
+    # 検索対象の地点の確認
+    for target_date in TARGET_POINTS:
+        lat, lng, target_point = target_date
+        if not isinstance(lat, float):
+            logger.error("緯度は小数で設定してください。")
+            sys.exit(1)
+        if not isinstance(lng, float):
+            logger.error("経度は小数で設定してください。")
+        if not 20.4 <= lat <= 45.6:
+            logger.error("緯度は20.4度〜45.6度の小数で設定してください。")
+            sys.exit(1)
+        if not 122.9 <= lng <= 154.0:
+            logger.error("経度は122.9度〜154.0度の小数で設定してください。")
+            sys.exit(1)
+        if not isinstance(target_point, float):
+            logger.error("地点は文字列で設定してください。")
+            sys.exit(1)
+
+    # 検索範囲の確認
+    if not isinstance(SEARCH_RADIUS_M, int):
+        logger.error("検索範囲は整数で設定してください。")
+        sys.exit(1)
+    if not 0 < SEARCH_RADIUS_M < MAX_SEARCH_RADIUS_M:
+        logger.error(
+            f"検索範囲は{MAX_SEARCH_RADIUS_M}m未満の自然数で設定してください。"
+        )
+        sys.exit(1)
+
+    # BBOXを使った絞り込みの範囲の確認
+    if not isinstance(search_radius_padding_factor, float):
+        logger.error("BBOXを使った絞り込みの範囲は小数で設定してください。")
+
+    # スレッド数の確認
+    if not isinstance(MAX_WORKERS, int) or MAX_WORKERS <= 0:
+        logger.error("スレッド数は自然数で設定してください。")
+
+    # データ出力先のパスの確認
+    if not output_dir.exists():
+        logger.error("ツールと同じ階層にresultディレクトリを作成してください。")
 
 
 if __name__ == "__main__":
