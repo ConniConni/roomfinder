@@ -15,6 +15,10 @@ TARGET_POINTS = [
 SEARCH_RADIUS_M = 1000
 MAX_SEARCH_RADIUS_M = 10000
 MAX_WORKERS = 3
+MAX_LAT = 145.6
+MIN_LAT = 20.4
+MAX_LNG = 154.0
+MIN_LNG = 122.9
 
 # --- 変数 ---
 # ログファイル格納先
@@ -83,11 +87,11 @@ def validate_params():
             sys.exit(1)
         if not isinstance(lng, float):
             logger.error("経度は小数で設定してください。")
-        if not 20.4 <= lat <= 45.6:
-            logger.error("緯度は20.4度〜45.6度の小数で設定してください。")
+        if not MIN_LAT <= lat <= MAX_LAT:
+            logger.error(f"緯度は{MIN_LAT}度〜{MAX_LAT}度の小数で設定してください。")
             sys.exit(1)
-        if not 122.9 <= lng <= 154.0:
-            logger.error("経度は122.9度〜154.0度の小数で設定してください。")
+        if not MIN_LNG <= lng <= MAX_LNG:
+            logger.error(f"経度は{MIN_LNG}度〜{MAX_LNG}度の小数で設定してください。")
             sys.exit(1)
         if not isinstance(target_point, float):
             logger.error("地点は文字列で設定してください。")
