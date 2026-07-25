@@ -36,7 +36,7 @@ def setup_logger(path, level=logging.DEBUG):
 
     # フォーマッタを作成しハンドラーに追加
     formatter = logging.Formatter(
-        "%(asctime)s - %(levelname)s - %(threadName)s - %(lineno)d - %(message)s"
+        "%(asctime)s - %(levelname)s - %(threadName)s - %(threadName)s - %(lineno)d - %(message)s"
     )
 
     console_handler.setFormatter(formatter)
@@ -47,4 +47,7 @@ def setup_logger(path, level=logging.DEBUG):
     root_logger.addHandler(file_handler)
 
 
-setup_logger(log_dir)
+if __name__ == "__main__":
+    # ロガー取得
+    setup_logger(log_dir)
+    logger = logging.getLogger()
