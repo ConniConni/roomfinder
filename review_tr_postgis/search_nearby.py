@@ -93,7 +93,7 @@ def validate_params():
         if not MIN_LNG <= lng <= MAX_LNG:
             logger.error(f"経度は{MIN_LNG}度〜{MAX_LNG}度の小数で設定してください。")
             sys.exit(1)
-        if not isinstance(target_point, float):
+        if not isinstance(target_point, str):
             logger.error("地点は文字列で設定してください。")
             sys.exit(1)
 
