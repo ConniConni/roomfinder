@@ -116,7 +116,7 @@ def validate_params():
         logger.error("スレッド数は自然数で設定してください。")
         sys.exit(1)
     # データ出力先のパスの確認
-    if not output_dir.exists():
+    if not output_dir.parent.exists():
         logger.error("ツールと同じ階層にresultディレクトリを作成してください。")
         sys.exit(1)
 
@@ -125,3 +125,5 @@ if __name__ == "__main__":
     # ロガー取得
     setup_logger(log_dir)
     logger = logging.getLogger()
+    # 変数の確認
+    validate_params()
