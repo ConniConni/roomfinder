@@ -19,6 +19,8 @@ def setup_logger(path, level=logging.DEBUG):
     # ログファイルのパスを整形
     now_str = datetime.now().strftime("%Y%m%d_%H%M%S")
     file_path = path / f"debug_{now_str}.log"
+    # logsディレクトリがない場合は生成
+    file_path.parent.mkdir(parents=True, exist_ok=True)
 
     # ルートロガーを取得し、ログレベルを設定
     root_logger = logging.getLogger()
@@ -43,3 +45,6 @@ def setup_logger(path, level=logging.DEBUG):
     # ルートロガーにハンドラーを追加
     root_logger.addHandler(console_handler)
     root_logger.addHandler(file_handler)
+
+
+setup_logger(log_dir)
