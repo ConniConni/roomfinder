@@ -110,14 +110,15 @@ def validate_params():
     # BBOXを使った絞り込みの範囲の確認
     if not isinstance(search_radius_padding_factor, float):
         logger.error("BBOXを使った絞り込みの範囲は小数で設定してください。")
-
+        sys.exit(1)
     # スレッド数の確認
     if not isinstance(MAX_WORKERS, int) or MAX_WORKERS <= 0:
         logger.error("スレッド数は自然数で設定してください。")
-
+        sys.exit(1)
     # データ出力先のパスの確認
     if not output_dir.exists():
         logger.error("ツールと同じ階層にresultディレクトリを作成してください。")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
