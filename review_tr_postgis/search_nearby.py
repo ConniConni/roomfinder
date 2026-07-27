@@ -1,5 +1,7 @@
 import logging
+import os
 import sys
+from dotenv import load_dotenv
 from pathlib import Path
 from datetime import datetime
 
@@ -119,6 +121,29 @@ def validate_params():
     if not output_dir.parent.exists():
         logger.error("ツールと同じ階層にresultディレクトリを作成してください。")
         sys.exit(1)
+
+
+def get_db_config():
+    """
+    .envファイルからDB接続情報を読み込み、辞書型に整形して返却する
+
+    Args:
+        なし
+    Return:
+        db_config (dict): 辞書型に整形されたDB接続情報
+    """
+
+    # .envの環境変数を読み込み
+    load_dotenv()
+
+    # 読み込んだ環境変数を辞書型に整形
+    db_config = {
+        "host": os.getenv("POSTGRES_HOST", "localhost"),
+        "port": os.getenv("POSTGRES_PORT"),
+        "database": os.getenv("POSTGRES_DB"),
+        "user": os.getenv("POSTGRES_USER"),
+        "password": os.getenv("POSTGRES_PASSWORD"),
+    }
 
 
 if __name__ == "__main__":
