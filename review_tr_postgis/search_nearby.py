@@ -130,20 +130,32 @@ def get_db_config():
     Args:
         なし
     Return:
-        db_config (dict): 辞書型に整形されたDB接続情報
+        config (dict): 辞書型に整形されたDB接続情報
     """
 
     # .envの環境変数を読み込み
     load_dotenv()
 
     # 読み込んだ環境変数を辞書型に整形
-    db_config = {
+    config = {
         "host": os.getenv("POSTGRES_HOST", "localhost"),
         "port": os.getenv("POSTGRES_PORT"),
         "database": os.getenv("POSTGRES_DB"),
         "user": os.getenv("POSTGRES_USER"),
         "password": os.getenv("POSTGRES_PASSWORD"),
     }
+
+    # 読み込みに失敗した値がないか確認
+    missing_keys = []
+    for key, value in config.items():
+        if not value:
+            missing_keys.append(key)
+
+    if missing_keys:
+        logger.error(
+            f"【接続エラー】以下の環境変数が未設定です。{', '.join(missing_keys)}"
+        )
+        sys.exit(1)
 
 
 if __name__ == "__main__":
@@ -152,3 +164,5 @@ if __name__ == "__main__":
     logger = logging.getLogger()
     # 変数の確認
     validate_params()
+    # DB接続情報取得
+    db_config = get_db_config()
