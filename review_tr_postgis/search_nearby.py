@@ -1,4 +1,5 @@
 import logging
+import os
 from pathlib import Path
 from datetime import datetime
 from dotenv import load_dotenv
@@ -58,7 +59,17 @@ def get_db_config():
         db_config (dict): 辞書型に整形されたDB接続情報
     """
 
+    # .envの環境変数を読み込み
     load_dotenv()
+
+    # 読み込んだ環境変数を辞書型に整形
+    db_config = {
+        "host": os.getenv("POSTGRES_HOST", "localhost"),
+        "port": os.getenv("POSTGRES_PORT"),
+        "database": os.getenv("POSTGRES_DB"),
+        "user": os.getenv("POSTGRES_USER"),
+        "password": os.getenv("POSTGRES_PASSWORD"),
+    }
 
 
 if __name__ == "__main__":
