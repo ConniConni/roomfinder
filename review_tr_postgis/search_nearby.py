@@ -69,6 +69,7 @@ def setup_logger(path, level=logging.DEBUG):
     root_logger.addHandler(file_handler)
 
 
+<<<<<<< Updated upstream
 def validate_params():
     """
     データ抽出に使用する定数及び変数がツールが許容する値であることを確認する
@@ -121,6 +122,8 @@ def validate_params():
         sys.exit(1)
 
 
+=======
+>>>>>>> Stashed changes
 if __name__ == "__main__":
     # ロガー取得
     setup_logger(log_dir)
