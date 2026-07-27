@@ -1,6 +1,7 @@
 import logging
 from pathlib import Path
 from datetime import datetime
+from dotenv import load_dotenv
 
 # --- 変数 ---
 # ログファイル格納先
@@ -45,6 +46,19 @@ def setup_logger(path, level=logging.DEBUG):
     # ルートロガーにハンドラーを追加
     root_logger.addHandler(console_handler)
     root_logger.addHandler(file_handler)
+
+
+def get_db_config():
+    """
+    .envファイルからDB接続情報を読み込み、辞書型に整形して返却する
+
+    Args:
+        なし
+    Return:
+        db_config (dict): 辞書型に整形されたDB接続情報
+    """
+
+    load_dotenv()
 
 
 if __name__ == "__main__":
