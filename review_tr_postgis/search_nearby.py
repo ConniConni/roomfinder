@@ -29,6 +29,8 @@ log_dir = Path(__file__).parent / "logs"
 search_radius_padding_factor = SEARCH_RADIUS_M / 111000 * 1.5
 # 取得結果出力先パス
 output_dir = Path(__file__).parent / "result" / "search_results.csv"
+# .envファイルのパス
+env_dir = Path(__file__).parent.parent / ".env"
 
 
 # --- 関数 ---
@@ -123,18 +125,18 @@ def validate_params():
         sys.exit(1)
 
 
-def get_db_config():
+def get_db_config(env_path):
     """
     .envファイルからDB接続情報を読み込み、辞書型に整形して返却する
 
     Args:
-        なし
+        env_path (Path | str): .envファイルのパス
     Return:
         config (dict): 辞書型に整形されたDB接続情報
     """
 
     # .envの環境変数を読み込み
-    load_dotenv()
+    load_dotenv(env_path)
 
     # 読み込んだ環境変数を辞書型に整形
     config = {
@@ -165,4 +167,4 @@ if __name__ == "__main__":
     # 変数の確認
     validate_params()
     # DB接続情報取得
-    db_config = get_db_config()
+    db_config = get_db_config(env_dir)
