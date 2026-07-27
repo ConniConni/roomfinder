@@ -159,6 +159,8 @@ def get_db_config(env_path):
         )
         sys.exit(1)
 
+    return config
+
 
 if __name__ == "__main__":
     # ロガー取得
