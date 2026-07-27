@@ -1,5 +1,7 @@
 import logging
+import os
 import sys
+from dotenv import load_dotenv
 from pathlib import Path
 from datetime import datetime
 
@@ -27,6 +29,8 @@ log_dir = Path(__file__).parent / "logs"
 search_radius_padding_factor = SEARCH_RADIUS_M / 111000 * 1.5
 # 取得結果出力先パス
 output_dir = Path(__file__).parent / "result" / "search_results.csv"
+# .envファイルのパス
+env_dir = Path(__file__).parent.parent / ".env"
 
 
 # --- 関数 ---
@@ -121,9 +125,48 @@ def validate_params():
         sys.exit(1)
 
 
+def get_db_config(env_path):
+    """
+    .envファイルからDB接続情報を読み込み、辞書型に整形して返却する
+
+    Args:
+        env_path (Path | str): .envファイルのパス
+    Return:
+        config (dict): 辞書型に整形されたDB接続情報
+    """
+
+    # .envの環境変数を読み込み
+    load_dotenv(env_path)
+
+    # 読み込んだ環境変数を辞書型に整形
+    config = {
+        "host": os.getenv("POSTGRES_HOST", "localhost"),
+        "port": os.getenv("POSTGRES_PORT"),
+        "database": os.getenv("POSTGRES_DB"),
+        "user": os.getenv("POSTGRES_USER"),
+        "password": os.getenv("POSTGRES_PASSWORD"),
+    }
+
+    # 読み込みに失敗した値がないか確認
+    missing_keys = []
+    for key, value in config.items():
+        if not value:
+            missing_keys.append(key)
+
+    if missing_keys:
+        logger.error(
+            f"【接続エラー】以下の環境変数が未設定です。{', '.join(missing_keys)}"
+        )
+        sys.exit(1)
+
+    return config
+
+
 if __name__ == "__main__":
     # ロガー取得
     setup_logger(log_dir)
     logger = logging.getLogger()
     # 変数の確認
     validate_params()
+    # DB接続情報取得
+    db_config = get_db_config(env_dir)
