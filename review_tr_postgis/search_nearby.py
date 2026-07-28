@@ -2,9 +2,11 @@ import csv
 import logging
 import os
 import sys
-from dotenv import load_dotenv
 from pathlib import Path
 from datetime import datetime
+
+from dotenv import load_dotenv
+import psycopg2
 
 # --- 定数 ---
 TARGET_POINTS = [
@@ -32,6 +34,35 @@ search_radius_padding_factor = SEARCH_RADIUS_M / 111000 * 1.5
 output_dir = Path(__file__).parent / "result" / "search_results.csv"
 # .envファイルのパス
 env_dir = Path(__file__).parent.parent / ".env"
+
+
+# --- クラス ---
+class ParallelDataFetcher:
+    """
+    DBから対象のデータを取得し、
+    取得データのリスト、処理の成功フラグ、および基準となると地点名
+    を一元管理して返す
+
+    Attributes:
+        db_config (dict): DB接続情報
+        target_point (tuple): 緯度, 経度, 地点名
+        search_radius (int): 検索半径
+        padding_factor (float): 検索距離(度)
+        max_workers (int): スレッド数
+        conn : DB接続オブジェクト 初期値 None
+
+    """
+
+    def __init__(
+        self, db_config, target_point, search_radius, padding_factor, max_workers
+    ):
+        """インスタンス変数を初期化"""
+        self.db_config = db_config
+        self.target_point = target_point
+        self.search_radius = search_radius
+        self.padding_factor = padding_factor
+        self.max_workers = max_workers
+        self.conn = None
 
 
 # --- 関数 ---
