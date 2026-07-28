@@ -347,7 +347,6 @@ flowchart TD
     - `target_point` (基準点)
     - `search_radius` (検索半径)
     - `padding_factor` (検索距離(度))
-    - `max_workers` (スレッド数)
     - `conn` (DB接続オブジェクト) 初期値 `None`
     - `__init__()`で初期化
   - クラスメソッド:

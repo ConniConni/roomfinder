@@ -52,15 +52,12 @@ class ParallelDataFetcher:
 
     """
 
-    def __init__(
-        self, db_config, target_point, search_radius, padding_factor, max_workers
-    ):
+    def __init__(self, db_config, target_point, search_radius, padding_factor):
         """インスタンス変数を初期化"""
         self.db_config = db_config
         self.target_point = target_point
         self.search_radius = search_radius
         self.padding_factor = padding_factor
-        self.max_workers = max_workers
         self.conn = None
 
     def connect(self):
@@ -307,7 +304,6 @@ if __name__ == "__main__":
         TARGET_POINTS[0],
         SEARCH_RADIUS_M,
         search_radius_padding_factor,
-        MAX_WORKERS,
     )
     is_success, result, target = a.run()
     print(f"is_success: {is_success}")
