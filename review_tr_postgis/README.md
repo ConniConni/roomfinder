@@ -203,8 +203,8 @@ END $$;
 SELECT
     id, name, category, ST_AsText(geom)
 FROM stores
-WHERE geom && ST_Expand(ST_SetSRID(ST_MakePoint(139.48,35.92),4326), 0.014) -- 東京都新宿区から約1.55kmにある地点を絞り込み
-AND ST_DWithin(ST_SetSRID(ST_MakePoint(139.48,35.92),4326)::geography, geom::geography, 1000) -- 1000m以内の地点を正確に計算
+WHERE geom && ST_Expand(ST_GeomFromText("POINT(139.48,35.92)",4326), 0.014) -- 東京都新宿区から約1.55kmにある地点を絞り込み
+AND ST_DWithin(ST_GeomFromText("POINT(139.48,35.92)",4326)::geography, geom::geography, 1000) -- 1000m以内の地点を正確に計算
 ;
 ```
 

@@ -85,8 +85,8 @@ class ParallelDataFetcher:
             SELECT
                 id, name, category, ST_AsText(geom)
             FROM stores
-            WHERE geom && ST_Expand(ST_SetSRID(%(point_wkt)s, 4326), %(deg_factor)s)
-            AND ST_DWithin(ST_SetSRID(%(point_wkt)s, 4326)::geography, geom::geography, %(dist)s)
+            WHERE geom && ST_Expand(ST_GeomFromText(%(point_wkt)s, 4326), %(deg_factor)s)
+            AND ST_DWithin(ST_GeomFromText(%(point_wkt)s, 4326)::geography, geom::geography, %(dist)s)
             ;
         """
         # パラメータ組み立て
@@ -111,9 +111,9 @@ class ParallelDataFetcher:
                 },
             ).decode("utf-8")
             logger.info(log_msg_sql)
-            result = cur.fetchall()
+            fetch_date = cur.fetchall()
 
-            return result
+            return fetch_date
 
 
 # --- 関数 ---
@@ -274,15 +274,20 @@ if __name__ == "__main__":
     db_config = get_db_config(env_dir)
 
     a = ParallelDataFetcher(
-        db_config, TARGET_POINTS[0], SEARCH_RADIUS_M, MAX_SEARCH_RADIUS_M, MAX_WORKERS
+        db_config,
+        TARGET_POINTS[0],
+        SEARCH_RADIUS_M,
+        search_radius_padding_factor,
+        MAX_WORKERS,
     )
-    # ダミーリスト
-    dummy_list = [
-        (1, "abc", "パン屋", "POINT(33.33 140.33)"),
-        (2, "def", "豆腐屋", "POINT(33.31 140.31)"),
-    ]
+    is_success, result, target = a.run()
+    print(f"is_success: {is_success}")
+    print(f"取得したリストのレコード数: {len(result)}")
+    print(f"地点: {target}")
 
-    if len(dummy_list) > 0:
-        save_to_csv(output_dir, dummy_list)
-    else:
+    if len(result) > 0:
+        save_to_csv(output_dir, result)
+    if is_success and len(result) == 0:
         logger.info("データ取得件数が0件のため書き込み処理をスキップ")
+    else:
+        pass
