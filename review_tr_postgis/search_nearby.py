@@ -5,6 +5,8 @@ import sys
 from pathlib import Path
 from datetime import datetime
 
+from urllib3 import connection_from_url
+
 from dotenv import load_dotenv
 import psycopg2
 
@@ -231,6 +233,9 @@ if __name__ == "__main__":
     # DB接続情報取得
     db_config = get_db_config(env_dir)
 
+    a = ParallelDataFetcher(
+        db_config, TARGET_POINTS[0], SEARCH_RADIUS_M, MAX_SEARCH_RADIUS_M, MAX_WORKERS
+    )
     # ダミーリスト
     dummy_list = [
         (1, "abc", "パン屋", "POINT(33.33 140.33)"),
