@@ -1,3 +1,4 @@
+import csv
 import logging
 import os
 import sys
@@ -181,3 +182,12 @@ if __name__ == "__main__":
     validate_params()
     # DB接続情報取得
     db_config = get_db_config(env_dir)
+
+    # ダミーリスト
+    dummy_list = []
+
+    if len(dummy_list) > 0:
+        save_to_csv(output_dir, dummy_list)
+        logger.info(f"{len(dummy_list)}件のデータを書き込みました。")
+    else:
+        logger.info("データ取得件数が0件のため書き込み処理をスキップ")
