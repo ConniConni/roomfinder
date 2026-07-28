@@ -107,7 +107,7 @@ class ParallelDataFetcher:
                     "dist": self.search_radius,
                 },
             ).decode("utf-8")
-            logger.info(log_msg_sql)
+            logger.debug(log_msg_sql)
             fetch_date = cur.fetchall()
 
             return fetch_date
