@@ -64,6 +64,15 @@ class ParallelDataFetcher:
         self.max_workers = max_workers
         self.conn = None
 
+    def connect(self):
+        """
+        DB接続を確保し、connを返す
+        """
+        self.conn = psycopg2.connect(**self.db_config)
+        logger.info("DB接続成功")
+
+        return self.conn
+
 
 # --- 関数 ---
 def setup_logger(path, level=logging.DEBUG):
