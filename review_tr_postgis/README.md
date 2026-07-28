@@ -203,8 +203,8 @@ END $$;
 SELECT
     id, name, category, ST_AsText(geom)
 FROM stores
-WHERE geom && ST_Expand(ST_SetSRID(ST_MakePoint(139.48,35.92),4326), 0.014) -- 東京都新宿区から約1.55kmにある地点を絞り込み
-AND ST_DWithin(ST_SetSRID(ST_MakePoint(139.48,35.92),4326)::geography, geom::geography, 1000) -- 1000m以内の地点を正確に計算
+WHERE geom && ST_Expand(ST_GeomFromText("POINT(139.48,35.92)",4326), 0.014) -- 東京都新宿区から約1.55kmにある地点を絞り込み
+AND ST_DWithin(ST_GeomFromText("POINT(139.48,35.92)",4326)::geography, geom::geography, 1000) -- 1000m以内の地点を正確に計算
 ;
 ```
 
@@ -347,7 +347,6 @@ flowchart TD
     - `target_point` (基準点)
     - `search_radius` (検索半径)
     - `padding_factor` (検索距離(度))
-    - `max_workers` (スレッド数)
     - `conn` (DB接続オブジェクト) 初期値 `None`
     - `__init__()`で初期化
   - クラスメソッド:

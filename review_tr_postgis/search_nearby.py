@@ -2,9 +2,10 @@ import csv
 import logging
 import os
 import sys
-from dotenv import load_dotenv
 from pathlib import Path
 from datetime import datetime
+from dotenv import load_dotenv
+import psycopg2
 
 # --- 定数 ---
 TARGET_POINTS = [
@@ -32,6 +33,113 @@ search_radius_padding_factor = SEARCH_RADIUS_M / 111000 * 1.5
 output_dir = Path(__file__).parent / "result" / "search_results.csv"
 # .envファイルのパス
 env_dir = Path(__file__).parent.parent / ".env"
+
+
+# --- クラス ---
+class ParallelDataFetcher:
+    """
+    DBから対象のデータを取得し、
+    取得データのリスト、処理の成功フラグ、および基準となると地点名
+    を一元管理して返す
+
+    Attributes:
+        db_config (dict): DB接続情報
+        target_point (tuple): 緯度, 経度, 地点名
+        search_radius (int): 検索半径
+        padding_factor (float): 検索距離(度)
+        max_workers (int): スレッド数
+        conn : DB接続オブジェクト 初期値 None
+
+    """
+
+    def __init__(self, db_config, target_point, search_radius, padding_factor):
+        """インスタンス変数を初期化"""
+        self.db_config = db_config
+        self.target_point = target_point
+        self.search_radius = search_radius
+        self.padding_factor = padding_factor
+        self.conn = None
+
+    def connect(self):
+        """
+        DB接続を確保し、connを返す
+        Return:
+            conn :DB接続オブジェクト
+        """
+        self.conn = psycopg2.connect(**self.db_config)
+        logger.info("DB接続成功")
+
+        return self.conn
+
+    def fetch_list(self):
+        """
+        SQLを実行し、対象の地点を取得し、リストで返却する
+        Return:
+            result (list): 取得したリスト
+        """
+
+        sql_body = """
+            SELECT
+                id, name, category, ST_AsText(geom)
+            FROM stores
+            WHERE geom && ST_Expand(ST_GeomFromText(%(point_wkt)s, 4326), %(deg_factor)s)
+            AND ST_DWithin(ST_GeomFromText(%(point_wkt)s, 4326)::geography, geom::geography, %(dist)s)
+            ;
+        """
+        # パラメータ組み立て
+        lat, lng, _ = self.target_point
+        point_wkt = f"POINT({lng} {lat})"
+
+        with self.conn.cursor() as cur:
+            cur.execute(
+                sql_body,
+                {
+                    "point_wkt": point_wkt,
+                    "deg_factor": self.padding_factor,
+                    "dist": self.search_radius,
+                },
+            )
+            log_msg_sql = cur.mogrify(
+                sql_body,
+                {
+                    "point_wkt": point_wkt,
+                    "deg_factor": self.padding_factor,
+                    "dist": self.search_radius,
+                },
+            ).decode("utf-8")
+            logger.debug(log_msg_sql)
+            fetch_date = cur.fetchall()
+
+            return fetch_date
+
+    def run(self):
+        """
+        実行メソッド
+        """
+        is_success = False
+        fetch_rows = []
+        try:
+            with self.connect() as conn:
+                fetch_rows = self.fetch_list()
+            is_success = True
+
+        except psycopg2.OperationalError as e:
+            logger.error(f"【DB接続エラー】設定を見直してください。:{e}")
+
+        except psycopg2.ProgrammingError as e:
+            logger.error(f"【SQL実行エラー】クエリの内容を確認してください。:{e}")
+
+        except psycopg2.Error as e:
+            logger.error(f"【その他DBエラー】:{e}")
+
+        except Exception as e:
+            logger.error(f"【予期せぬエラー】:{e}")
+        finally:
+            if self.conn:
+                self.conn.close()
+                logger.info("DB切断")
+
+        return (is_success, fetch_rows, self.target_point)
 
 
 # --- 関数 ---
@@ -191,13 +299,20 @@ if __name__ == "__main__":
     # DB接続情報取得
     db_config = get_db_config(env_dir)
 
-    # ダミーリスト
-    dummy_list = [
-        (1, "abc", "パン屋", "POINT(33.33 140.33)"),
-        (2, "def", "豆腐屋", "POINT(33.31 140.31)"),
-    ]
+    a = ParallelDataFetcher(
+        db_config,
+        TARGET_POINTS[0],
+        SEARCH_RADIUS_M,
+        search_radius_padding_factor,
+    )
+    is_success, result, target = a.run()
+    print(f"is_success: {is_success}")
+    print(f"取得したリストのレコード数: {len(result)}")
+    print(f"地点: {target}")
 
-    if len(dummy_list) > 0:
-        save_to_csv(output_dir, dummy_list)
-    else:
+    if len(result) > 0:
+        save_to_csv(output_dir, result)
+    if is_success and len(result) == 0:
         logger.info("データ取得件数が0件のため書き込み処理をスキップ")
+    else:
+        pass
