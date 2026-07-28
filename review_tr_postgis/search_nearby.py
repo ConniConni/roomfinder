@@ -115,6 +115,35 @@ class ParallelDataFetcher:
 
             return fetch_date
 
+    def run(self):
+        """
+        実行メソッド
+        """
+        is_success = False
+        fetch_rows = []
+        try:
+            with self.connect() as conn:
+                fetch_rows = self.fetch_list()
+            is_success = True
+
+        except psycopg2.OperationalError as e:
+            logger.error(f"【DB接続エラー】設定を見直してください。:{e}")
+
+        except psycopg2.ProgrammingError as e:
+            logger.error(f"【SQL実行エラー】クエリの内容を確認してください。:{e}")
+
+        except psycopg2.Error as e:
+            logger.error(f"【その他DBエラー】:{e}")
+
+        except Exception as e:
+            logger.error(f"【予期せぬエラー】:{e}")
+        finally:
+            if self.conn:
+                self.conn.close()
+                logger.info("DB切断")
+
+        return (is_success, fetch_rows, self.target_point)
+
 
 # --- 関数 ---
 def setup_logger(path, level=logging.DEBUG):
