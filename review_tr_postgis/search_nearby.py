@@ -4,9 +4,6 @@ import os
 import sys
 from pathlib import Path
 from datetime import datetime
-
-from urllib3 import connection_from_url
-
 from dotenv import load_dotenv
 import psycopg2
 
@@ -69,11 +66,54 @@ class ParallelDataFetcher:
     def connect(self):
         """
         DB接続を確保し、connを返す
+        Return:
+            conn :DB接続オブジェクト
         """
         self.conn = psycopg2.connect(**self.db_config)
         logger.info("DB接続成功")
 
         return self.conn
+
+    def fetch_list(self):
+        """
+        SQLを実行し、対象の地点を取得し、リストで返却する
+        Return:
+            result (list): 取得したリスト
+        """
+
+        sql_body = """
+            SELECT
+                id, name, category, ST_AsText(geom)
+            FROM stores
+            WHERE geom && ST_Expand(ST_SetSRID(%(point_wkt)s, 4326), %(deg_factor)s)
+            AND ST_DWithin(ST_SetSRID(%(point_wkt)s, 4326)::geography, geom::geography, %(dist)s)
+            ;
+        """
+        # パラメータ組み立て
+        lat, lng, _ = self.target_point
+        point_wkt = f"POINT({lng} {lat})"
+
+        with self.conn.cursor() as cur:
+            cur.execute(
+                sql_body,
+                {
+                    "point_wkt": point_wkt,
+                    "deg_factor": self.padding_factor,
+                    "dist": self.search_radius,
+                },
+            )
+            log_msg_sql = cur.mogrify(
+                sql_body,
+                {
+                    "point_wkt": point_wkt,
+                    "deg_factor": self.padding_factor,
+                    "dist": self.search_radius,
+                },
+            ).decode("utf-8")
+            logger.info(log_msg_sql)
+            result = cur.fetchall()
+
+            return result
 
 
 # --- 関数 ---
