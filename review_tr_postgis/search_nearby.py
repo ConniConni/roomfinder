@@ -1,3 +1,4 @@
+import csv
 import logging
 import os
 import sys
@@ -162,6 +163,25 @@ def get_db_config(env_path):
     return config
 
 
+def save_to_csv(file_path, rows):
+    """
+    データの取得結果をCSVで保存する
+    Args:
+        file_path (Path | str): CSVファイルのパス
+        rows (list): 取得したデータのリスト
+    Return:
+        なし
+    """
+
+    csv_header = ["id", "name", "category", "geom"]
+
+    with open(file_path, mode="w", encoding="utf-8", newline="") as f:
+        write = csv.writer(f)
+        write.writerow(csv_header)
+        write.writerows(rows)
+        logger.info(f"{len(rows)}件のデータを書き込みました。")
+
+
 if __name__ == "__main__":
     # ロガー取得
     setup_logger(log_dir)
@@ -170,3 +190,14 @@ if __name__ == "__main__":
     validate_params()
     # DB接続情報取得
     db_config = get_db_config(env_dir)
+
+    # ダミーリスト
+    dummy_list = [
+        (1, "abc", "パン屋", "POINT(33.33 140.33)"),
+        (2, "def", "豆腐屋", "POINT(33.31 140.31)"),
+    ]
+
+    if len(dummy_list) > 0:
+        save_to_csv(output_dir, dummy_list)
+    else:
+        logger.info("データ取得件数が0件のため書き込み処理をスキップ")
