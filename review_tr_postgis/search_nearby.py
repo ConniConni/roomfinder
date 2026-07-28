@@ -162,6 +162,17 @@ def get_db_config(env_path):
     return config
 
 
+def save_to_csv(file_path, fetch_list):
+    """
+    データの取得結果をCSVで保存する
+    Args:
+        file_path (Path | str): CSVファイルのパス
+        fetch_list (list): 取得したデータのリスト
+    Return:
+        なし
+    """
+
+
 if __name__ == "__main__":
     # ロガー取得
     setup_logger(log_dir)
