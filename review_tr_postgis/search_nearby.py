@@ -299,6 +299,11 @@ if __name__ == "__main__":
     # DB接続情報取得
     db_config = get_db_config(env_dir)
 
+    # マルチスレッドで取得したリストの格納先
+    all_combined_rows = []
+    # マルチスレッドの成功回数
+    success_count = 0
+
     a = ParallelDataFetcher(
         db_config,
         TARGET_POINTS[0],
