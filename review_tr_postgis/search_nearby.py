@@ -1,8 +1,9 @@
+from asyncio import as_completed
 import csv
 import logging
 import os
 import sys
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from datetime import datetime
 from dotenv import load_dotenv
@@ -321,6 +322,9 @@ if __name__ == "__main__":
             ): label
             for lat, lng, label in TARGET_POINTS
         }
+
+        for future in as_completed(future_to_point):
+            label = future_to_point[future]
 
     is_success, result, target = a.run()
     print(f"is_success: {is_success}")
