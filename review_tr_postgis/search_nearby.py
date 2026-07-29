@@ -311,12 +311,14 @@ if __name__ == "__main__":
         logger.info(f"スレッド処理開始: スレッド数: {MAX_WORKERS}")
 
         future_to_point = {
-            ParallelDataFetcher(
-                db_config,
-                (lat, lng),
-                SEARCH_RADIUS_M,
-                search_radius_padding_factor,
-            ).run: label
+            executor.submit(
+                ParallelDataFetcher(
+                    db_config,
+                    (lat, lng),
+                    SEARCH_RADIUS_M,
+                    search_radius_padding_factor,
+                ).run
+            ): label
             for lat, lng, label in TARGET_POINTS
         }
 
