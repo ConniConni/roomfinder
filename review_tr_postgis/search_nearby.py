@@ -310,12 +310,16 @@ if __name__ == "__main__":
     ) as executor:
         logger.info(f"スレッド処理開始: スレッド数: {MAX_WORKERS}")
 
-    a = ParallelDataFetcher(
-        db_config,
-        TARGET_POINTS[0],
-        SEARCH_RADIUS_M,
-        search_radius_padding_factor,
-    )
+        future_to_point = {
+            ParallelDataFetcher(
+                db_config,
+                (lat, lng),
+                SEARCH_RADIUS_M,
+                search_radius_padding_factor,
+            ).run: label
+            for lat, lng, label in TARGET_POINTS
+        }
+
     is_success, result, target = a.run()
     print(f"is_success: {is_success}")
     print(f"取得したリストのレコード数: {len(result)}")
