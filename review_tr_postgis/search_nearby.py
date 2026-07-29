@@ -1,7 +1,13 @@
+from asyncio import as_completed
+import csv
 import logging
+import os
 import sys
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from datetime import datetime
+from dotenv import load_dotenv
+import psycopg2
 
 # --- 定数 ---
 TARGET_POINTS = [
@@ -27,6 +33,115 @@ log_dir = Path(__file__).parent / "logs"
 search_radius_padding_factor = SEARCH_RADIUS_M / 111000 * 1.5
 # 取得結果出力先パス
 output_dir = Path(__file__).parent / "result" / "search_results.csv"
+# .envファイルのパス
+env_dir = Path(__file__).parent.parent / ".env"
+
+
+# --- クラス ---
+class ParallelDataFetcher:
+    """
+    DBから対象のデータを取得し、
+    取得データのリスト、処理の成功フラグ、および基準となると地点名
+    を一元管理して返す
+
+    Attributes:
+        db_config (dict): DB接続情報
+        target_point (tuple): 緯度, 経度
+        search_radius (int): 検索半径
+        padding_factor (float): 検索距離(度)
+        max_workers (int): スレッド数
+        conn : DB接続オブジェクト 初期値 None
+
+    """
+
+    def __init__(self, db_config, target_point, search_radius, padding_factor):
+        """インスタンス変数を初期化"""
+        self.db_config = db_config
+        self.target_point = target_point
+        self.search_radius = search_radius
+        self.padding_factor = padding_factor
+        self.conn = None
+
+    def connect(self):
+        """
+        DB接続を確保し、connを返す
+        Return:
+            conn :DB接続オブジェクト
+        """
+        self.conn = psycopg2.connect(**self.db_config)
+        logger.info("DB接続成功")
+
+        return self.conn
+
+    def fetch_list(self):
+        """
+        SQLを実行し、対象の地点を取得し、リストで返却する
+        Return:
+            result (list): 取得したリスト
+        """
+
+        sql_body = """
+            SELECT
+                id, name, category, ST_AsText(geom)
+            FROM stores
+            WHERE geom && ST_Expand(ST_GeomFromText(%(point_wkt)s, 4326), %(deg_factor)s)
+            AND ST_DWithin(ST_GeomFromText(%(point_wkt)s, 4326)::geography, geom::geography, %(dist)s)
+            ;
+        """
+        # パラメータ組み立て
+        lat, lng = self.target_point
+        point_wkt = f"POINT({lng} {lat})"
+
+        with self.conn.cursor() as cur:
+            cur.execute(
+                sql_body,
+                {
+                    "point_wkt": point_wkt,
+                    "deg_factor": self.padding_factor,
+                    "dist": self.search_radius,
+                },
+            )
+            log_msg_sql = cur.mogrify(
+                sql_body,
+                {
+                    "point_wkt": point_wkt,
+                    "deg_factor": self.padding_factor,
+                    "dist": self.search_radius,
+                },
+            ).decode("utf-8")
+            logger.debug(log_msg_sql)
+            fetch_date = cur.fetchall()
+
+            return fetch_date
+
+    def run(self):
+        """
+        実行メソッド
+        """
+        is_success = False
+        fetch_rows = []
+        try:
+            with self.connect() as conn:
+                fetch_rows = self.fetch_list()
+            is_success = True
+
+        except psycopg2.OperationalError as e:
+            logger.error(f"【DB接続エラー】設定を見直してください。:{e}")
+
+        except psycopg2.ProgrammingError as e:
+            logger.error(f"【SQL実行エラー】クエリの内容を確認してください。:{e}")
+
+        except psycopg2.Error as e:
+            logger.error(f"【その他DBエラー】:{e}")
+
+        except Exception as e:
+            logger.error(f"【予期せぬエラー】:{e}")
+        finally:
+            if self.conn:
+                self.conn.close()
+                logger.info("DB切断")
+
+        return (is_success, fetch_rows, self.target_point)
 
 
 # --- 関数 ---
@@ -58,7 +173,7 @@ def setup_logger(path, level=logging.DEBUG):
 
     # フォーマッタを作成しハンドラーに追加
     formatter = logging.Formatter(
-        "%(asctime)s - %(levelname)s - %(threadName)s - %(threadName)s - %(lineno)d - %(message)s"
+        "%(asctime)s - %(levelname)s - %(threadName)s - %(lineno)d - %(message)s"
     )
 
     console_handler.setFormatter(formatter)
@@ -121,9 +236,113 @@ def validate_params():
         sys.exit(1)
 
 
+def get_db_config(env_path):
+    """
+    .envファイルからDB接続情報を読み込み、辞書型に整形して返却する
+
+    Args:
+        env_path (Path | str): .envファイルのパス
+    Return:
+        config (dict): 辞書型に整形されたDB接続情報
+    """
+
+    # .envの環境変数を読み込み
+    load_dotenv(env_path)
+
+    # 読み込んだ環境変数を辞書型に整形
+    config = {
+        "host": os.getenv("POSTGRES_HOST", "localhost"),
+        "port": os.getenv("POSTGRES_PORT"),
+        "database": os.getenv("POSTGRES_DB"),
+        "user": os.getenv("POSTGRES_USER"),
+        "password": os.getenv("POSTGRES_PASSWORD"),
+    }
+
+    # 読み込みに失敗した値がないか確認
+    missing_keys = []
+    for key, value in config.items():
+        if not value:
+            missing_keys.append(key)
+
+    if missing_keys:
+        logger.error(
+            f"【接続エラー】以下の環境変数が未設定です。{', '.join(missing_keys)}"
+        )
+        sys.exit(1)
+
+    return config
+
+
+def save_to_csv(file_path, rows):
+    """
+    データの取得結果をCSVで保存する
+    Args:
+        file_path (Path | str): CSVファイルのパス
+        rows (list): 取得したデータのリスト
+    Return:
+        なし
+    """
+
+    csv_header = ["id", "name", "category", "geom"]
+
+    with open(file_path, mode="w", encoding="utf-8", newline="") as f:
+        write = csv.writer(f)
+        write.writerow(csv_header)
+        write.writerows(rows)
+        logger.info(f"{len(rows)}件のデータを書き込みました。")
+
+
 if __name__ == "__main__":
     # ロガー取得
     setup_logger(log_dir)
     logger = logging.getLogger()
     # 変数の確認
     validate_params()
+    # DB接続情報取得
+    db_config = get_db_config(env_dir)
+
+    # マルチスレッドで取得したリストの格納先
+    all_combined_rows = []
+    # マルチスレッドの成功回数
+    success_count = 0
+
+    with ThreadPoolExecutor(
+        max_workers=MAX_WORKERS, thread_name_prefix="Thread"
+    ) as executor:
+        logger.info(f"スレッド処理開始: スレッド数: {MAX_WORKERS}")
+
+        future_to_point = {
+            executor.submit(
+                ParallelDataFetcher(
+                    db_config,
+                    (lat, lng),
+                    SEARCH_RADIUS_M,
+                    search_radius_padding_factor,
+                ).run
+            ): label
+            for lat, lng, label in TARGET_POINTS
+        }
+
+        for future in as_completed(future_to_point):
+            label = future_to_point[future]
+
+            try:
+                is_success, rows, point = future.result()
+
+                if len(rows) > 0:
+                    all_combined_rows.extend(rows)
+                    logger.info(f"{label}{point}: {len(rows)}件取得 ")
+                    success_count += 1
+                elif is_success and len(rows) == 0:
+                    logger.info(f"{label}{point}: 該当データなし")
+                    success_count += 1
+                else:
+                    logger.error(f"{label}{point}: 実行スレッドでエラー発生")
+            except Exception as e:
+                logger.error(f"【予期せぬ例外】{label}: {e}")
+    logger.info(f"スレッド処理終了: 成功地点 {success_count}/{len(TARGET_POINTS)}")
+
+    if len(all_combined_rows) > 0:
+        save_to_csv(output_dir, all_combined_rows)
+    if is_success and len(all_combined_rows) == 0:
+        logger.info("データ取得件数が0件のため書き込み処理をスキップ")
