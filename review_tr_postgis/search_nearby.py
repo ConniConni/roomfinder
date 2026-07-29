@@ -173,7 +173,7 @@ def setup_logger(path, level=logging.DEBUG):
 
     # フォーマッタを作成しハンドラーに追加
     formatter = logging.Formatter(
-        "%(asctime)s - %(levelname)s - %(threadName)s - %(threadName)s - %(lineno)d - %(message)s"
+        "%(asctime)s - %(levelname)s - %(threadName)s - %(lineno)d - %(message)s"
     )
 
     console_handler.setFormatter(formatter)
