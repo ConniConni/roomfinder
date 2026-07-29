@@ -328,17 +328,21 @@ if __name__ == "__main__":
 
             try:
                 is_success, rows, point = future.result()
+
+                if len(rows) > 0:
+                    all_combined_rows.extend(rows)
+                    logger.info(f"{label}{point}: {len(rows)}件取得 ")
+                    success_count += 1
+                elif is_success and len(rows) == 0:
+                    logger.info(f"{label}{point}: 該当データなし")
+                    success_count += 1
+                else:
+                    logger.error(f"{label}{point}: 実行スレッドでエラー発生")
             except Exception as e:
                 logger.error(f"【予期せぬ例外】{label}: {e}")
-    sys.exit(0)
-    is_success, result, target = a.run()
-    print(f"is_success: {is_success}")
-    print(f"取得したリストのレコード数: {len(result)}")
-    print(f"地点: {target}")
+    logger.info(f"スレッド処理終了: 成功地点 {success_count}/{len(TARGET_POINTS)}")
 
-    if len(result) > 0:
-        save_to_csv(output_dir, result)
-    if is_success and len(result) == 0:
+    if len(all_combined_rows) > 0:
+        save_to_csv(output_dir, all_combined_rows)
+    if is_success and len(all_combined_rows) == 0:
         logger.info("データ取得件数が0件のため書き込み処理をスキップ")
-    else:
-        pass
