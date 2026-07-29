@@ -46,7 +46,7 @@ class ParallelDataFetcher:
 
     Attributes:
         db_config (dict): DB接続情報
-        target_point (tuple): 緯度, 経度, 地点名
+        target_point (tuple): 緯度, 経度
         search_radius (int): 検索半径
         padding_factor (float): 検索距離(度)
         max_workers (int): スレッド数
@@ -89,7 +89,7 @@ class ParallelDataFetcher:
             ;
         """
         # パラメータ組み立て
-        lat, lng, _ = self.target_point
+        lat, lng = self.target_point
         point_wkt = f"POINT({lng} {lat})"
 
         with self.conn.cursor() as cur:
@@ -315,7 +315,7 @@ if __name__ == "__main__":
             executor.submit(
                 ParallelDataFetcher(
                     db_config,
-                    (lat, lng, label),
+                    (lat, lng),
                     SEARCH_RADIUS_M,
                     search_radius_padding_factor,
                 ).run
@@ -330,7 +330,7 @@ if __name__ == "__main__":
                 is_success, rows, point = future.result()
             except Exception as e:
                 logger.error(f"【予期せぬ例外】{label}: {e}")
-
+    sys.exit(0)
     is_success, result, target = a.run()
     print(f"is_success: {is_success}")
     print(f"取得したリストのレコード数: {len(result)}")
