@@ -1,7 +1,9 @@
+from asyncio import as_completed
 import csv
 import logging
 import os
 import sys
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from datetime import datetime
 from dotenv import load_dotenv
@@ -44,7 +46,7 @@ class ParallelDataFetcher:
 
     Attributes:
         db_config (dict): DB接続情報
-        target_point (tuple): 緯度, 経度, 地点名
+        target_point (tuple): 緯度, 経度
         search_radius (int): 検索半径
         padding_factor (float): 検索距離(度)
         max_workers (int): スレッド数
@@ -87,7 +89,7 @@ class ParallelDataFetcher:
             ;
         """
         # パラメータ組み立て
-        lat, lng, _ = self.target_point
+        lat, lng = self.target_point
         point_wkt = f"POINT({lng} {lat})"
 
         with self.conn.cursor() as cur:
@@ -299,20 +301,48 @@ if __name__ == "__main__":
     # DB接続情報取得
     db_config = get_db_config(env_dir)
 
-    a = ParallelDataFetcher(
-        db_config,
-        TARGET_POINTS[0],
-        SEARCH_RADIUS_M,
-        search_radius_padding_factor,
-    )
-    is_success, result, target = a.run()
-    print(f"is_success: {is_success}")
-    print(f"取得したリストのレコード数: {len(result)}")
-    print(f"地点: {target}")
+    # マルチスレッドで取得したリストの格納先
+    all_combined_rows = []
+    # マルチスレッドの成功回数
+    success_count = 0
 
-    if len(result) > 0:
-        save_to_csv(output_dir, result)
-    if is_success and len(result) == 0:
+    with ThreadPoolExecutor(
+        max_workers=MAX_WORKERS, thread_name_prefix="Thread"
+    ) as executor:
+        logger.info(f"スレッド処理開始: スレッド数: {MAX_WORKERS}")
+
+        future_to_point = {
+            executor.submit(
+                ParallelDataFetcher(
+                    db_config,
+                    (lat, lng),
+                    SEARCH_RADIUS_M,
+                    search_radius_padding_factor,
+                ).run
+            ): label
+            for lat, lng, label in TARGET_POINTS
+        }
+
+        for future in as_completed(future_to_point):
+            label = future_to_point[future]
+
+            try:
+                is_success, rows, point = future.result()
+
+                if len(rows) > 0:
+                    all_combined_rows.extend(rows)
+                    logger.info(f"{label}{point}: {len(rows)}件取得 ")
+                    success_count += 1
+                elif is_success and len(rows) == 0:
+                    logger.info(f"{label}{point}: 該当データなし")
+                    success_count += 1
+                else:
+                    logger.error(f"{label}{point}: 実行スレッドでエラー発生")
+            except Exception as e:
+                logger.error(f"【予期せぬ例外】{label}: {e}")
+    logger.info(f"スレッド処理終了: 成功地点 {success_count}/{len(TARGET_POINTS)}")
+
+    if len(all_combined_rows) > 0:
+        save_to_csv(output_dir, all_combined_rows)
+    if is_success and len(all_combined_rows) == 0:
         logger.info("データ取得件数が0件のため書き込み処理をスキップ")
-    else:
-        pass
