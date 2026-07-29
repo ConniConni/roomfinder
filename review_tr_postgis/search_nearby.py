@@ -2,6 +2,7 @@ import csv
 import logging
 import os
 import sys
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from datetime import datetime
 from dotenv import load_dotenv
@@ -303,6 +304,11 @@ if __name__ == "__main__":
     all_combined_rows = []
     # マルチスレッドの成功回数
     success_count = 0
+
+    with ThreadPoolExecutor(
+        max_workers=MAX_WORKERS, thread_name_prefix="Thread"
+    ) as executor:
+        logger.info(f"スレッド処理開始: スレッド数: {MAX_WORKERS}")
 
     a = ParallelDataFetcher(
         db_config,
