@@ -20,7 +20,7 @@ app = FastAPI()
 
 @app.post("/item/")
 async def create_item(item: Item):
-    return {f"message: {item.name}の税込価格は{int(item.price*item.tax)}円です。"}
+    return {"message": f"{item.name}の税込価格は{int(item.price*item.tax)}円です。"}
 
 
 # # httpメソッドで"/"にgetでアクセスがあったら処理を行う
