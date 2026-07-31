@@ -3,6 +3,7 @@ import csv
 import logging
 import os
 import sys
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from datetime import datetime
@@ -296,6 +297,9 @@ if __name__ == "__main__":
     # ロガー取得
     setup_logger(log_dir)
     logger = logging.getLogger()
+
+    start_time = time.perf_counter()
+    logger.info("---- 処理開始 ----")
     # 変数の確認
     validate_params()
     # DB接続情報取得
@@ -346,3 +350,10 @@ if __name__ == "__main__":
         save_to_csv(output_dir, all_combined_rows)
     if is_success and len(all_combined_rows) == 0:
         logger.info("データ取得件数が0件のため書き込み処理をスキップ")
+
+    end_time = time.perf_counter()
+    actual_time = end_time - start_time
+    if success_count == len(TARGET_POINTS):
+        logger.info(f"---- 正常終了 ---- 実行時間: {actual_time:.3f} 秒 ")
+    else:
+        logger.info(f"---- 異常終了 ---- 実行時間: {actual_time:.3f} 秒")
