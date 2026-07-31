@@ -16,7 +16,15 @@ app = FastAPI()
 #     return {"country_name": country_name}
 
 
-# /countries/?country_name=america&country_no=2でアクセスするとクエリパラメータの内容を表示する
-@app.get("/countries/")  # パスパラメータにない引数を使うとクエリパラメータとなる
-async def country(country_name: str = "japan", country_no: int = 1):
-    return {"country_name": country_name, "country_no": country_no}
+# # /countries/?country_name=america&country_no=2でアクセスするとクエリパラメータの内容を表示する
+# @app.get("/countries/")  # パスパラメータにない引数を使うとクエリパラメータとなる
+# async def country(country_name: str = "japan", country_no: int = 1):
+#     return {"country_name": country_name, "country_no": country_no}
+
+
+# パスパラメータとクエリパラメータの組み合わせ /countries/america?city_name=boston
+@app.get(
+    "/countries/{country_name}"
+)  # パスパラメータにない引数を使うとクエリパラメータとなる
+async def country(country_name: str = "japan", city_name: str = "tokyo"):
+    return {"country_name": country_name, "city_name": city_name}
