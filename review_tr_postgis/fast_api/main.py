@@ -9,6 +9,8 @@ app = FastAPI()
 
 
 # httpメソッドで"/"にgetでアクセスがあったら処理を行う
-@app.get("/")  # "/":パスオペレーション
-async def index():
-    return {"message": "Hello World"}
+@app.get(
+    "/countries/{country_name}"
+)  # "/":パスオペレーション パスパラメータで動的な変数を組み込める
+async def country(country_name: str):
+    return {"country_name": country_name}
