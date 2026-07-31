@@ -2,9 +2,14 @@
 # /docs で自動生成されたswaggerドキュメントを確認できる
 # /redoc でhtmlベースのドキュメントページも生成される
 
-from typing import Optional
+from typing import Optional, List
 from fastapi import FastAPI
 from pydantic import BaseModel
+
+
+class ShopInfo(BaseModel):
+    name: str
+    location: str
 
 
 class Item(BaseModel):
@@ -14,13 +19,23 @@ class Item(BaseModel):
     tax: Optional[float] = None
 
 
+class Data(BaseModel):
+    shop_info: ShopInfo
+    items: List[Item]
+
+
 # fastapiをインスタンス化しそこに設定を加えていく
 app = FastAPI()
 
 
-@app.post("/item/")
-async def create_item(item: Item):
-    return {"message": f"{item.name}の税込価格は{int(item.price*item.tax)}円です。"}
+@app.post("/")
+async def create_item(data: Data):
+    item_strings = [
+        f"{item.name}は税込{int(item.price * (item.tax if item.tax is not None else 1.0))}円"
+        for item in data.items
+    ]
+    message_text = ", ".join(item_strings)
+    return {"message": f"店舗名:{data.shop_info.name} {message_text}"}
 
 
 # # httpメソッドで"/"にgetでアクセスがあったら処理を行う
