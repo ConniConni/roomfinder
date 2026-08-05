@@ -7,7 +7,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from datetime import datetime
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, status
 from pydantic import BaseModel
 
 # --- 定数 ---
@@ -201,38 +201,34 @@ def validate_params():
     for target_date in TARGET_POINTS:
         lat, lng, target_point = target_date
         if not isinstance(lat, float):
-            logger.error("緯度は小数で設定してください。")
-            sys.exit(1)
+            raise ValueError("緯度は小数で設定してください。")
         if not isinstance(lng, float):
-            logger.error("経度は小数で設定してください。")
+            raise ValueError("経度は小数で設定してください。")
         if not MIN_LAT <= lat <= MAX_LAT:
-            logger.error(f"緯度は{MIN_LAT}度〜{MAX_LAT}度の小数で設定してください。")
-            sys.exit(1)
+            raise ValueError(
+                f"緯度は{MIN_LAT}度〜{MAX_LAT}度の小数で設定してください。"
+            )
         if not MIN_LNG <= lng <= MAX_LNG:
-            logger.error(f"経度は{MIN_LNG}度〜{MAX_LNG}度の小数で設定してください。")
-            sys.exit(1)
+            raise ValueError(
+                f"経度は{MIN_LNG}度〜{MAX_LNG}度の小数で設定してください。"
+            )
         if not isinstance(target_point, str):
-            logger.error("地点は文字列で設定してください。")
-            sys.exit(1)
+            raise ValueError("地点は文字列で設定してください。")
 
     # 検索範囲の確認
     if not isinstance(SEARCH_RADIUS_M, int):
-        logger.error("検索範囲は整数で設定してください。")
-        sys.exit(1)
+        raise ValueError("検索範囲は整数で設定してください。")
     if not 0 < SEARCH_RADIUS_M < MAX_SEARCH_RADIUS_M:
-        logger.error(
+        raise ValueError(
             f"検索範囲は{MAX_SEARCH_RADIUS_M}m未満の自然数で設定してください。"
         )
-        sys.exit(1)
 
     # BBOXを使った絞り込みの範囲の確認
     if not isinstance(search_radius_padding_factor, float):
-        logger.error("BBOXを使った絞り込みの範囲は小数で設定してください。")
-        sys.exit(1)
+        raise ValueError("BBOXを使った絞り込みの範囲は小数で設定してください。")
     # スレッド数の確認
     if not isinstance(MAX_WORKERS, int) or MAX_WORKERS <= 0:
-        logger.error("スレッド数は自然数で設定してください。")
-        sys.exit(1)
+        raise ValueError("スレッド数は自然数で設定してください。")
 
 
 def get_db_config(env_path):
@@ -292,7 +288,11 @@ async def get_search_info():
     start_time = time.perf_counter()
     logger.info("---- 処理開始 ----")
     # 変数の確認
-    validate_params()
+    try:
+        validate_params()
+    except ValueError as e:
+        logger.error(f"【パラメータエラー】: {e}")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     # DB接続情報取得
     db_config = get_db_config(env_dir)
 
