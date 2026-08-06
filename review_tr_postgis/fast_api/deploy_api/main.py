@@ -1,7 +1,6 @@
 import logging
 import os
 import psycopg2
-import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
@@ -262,10 +261,7 @@ def get_db_config(env_path):
     log_message = f"【接続エラー】以下の環境変数が未設定です。{', '.join(missing_keys)}"
     if missing_keys:
         logger.error(log_message)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=log_message,
-        )
+        return log_message
 
     return config
 
