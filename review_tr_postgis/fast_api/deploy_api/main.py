@@ -342,9 +342,13 @@ async def get_search_info():
     actual_time = end_time - start_time
     if success_count == len(TARGET_POINTS):
         logger.info(f"---- 正常終了 ---- 実行時間: {actual_time:.3f} 秒 ")
+        return {"result": all_combined_rows}
     else:
         logger.info(f"---- 異常終了 ---- 実行時間: {actual_time:.3f} 秒")
-    return {"result": all_combined_rows}
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal Server Error",
+        )
 
 
 @app.post("/")
