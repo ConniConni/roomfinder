@@ -1,14 +1,13 @@
-from asyncio import as_completed
-import csv
 import logging
 import os
-import sys
+import psycopg2
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from datetime import datetime
 from dotenv import load_dotenv
-import psycopg2
+from fastapi import FastAPI, HTTPException, status
+from pydantic import BaseModel
 
 # --- 定数 ---
 TARGET_POINTS = [
@@ -32,13 +31,15 @@ MIN_LNG = 122.9
 log_dir = Path(__file__).parent / "logs"
 # 単位:度でのざっくりとした絞り込み用の係数
 search_radius_padding_factor = SEARCH_RADIUS_M / 111000 * 1.5
-# 取得結果出力先パス
-output_dir = Path(__file__).parent / "result" / "search_results.csv"
 # .envファイルのパス
-env_dir = Path(__file__).parent.parent / ".env"
+env_dir = Path(__file__).parent.parent.parent.parent / ".env"
 
 
-# --- クラス ---
+class Data(BaseModel):
+    x: float
+    y: float
+
+
 class ParallelDataFetcher:
     """
     DBから対象のデータを取得し、
@@ -199,42 +200,34 @@ def validate_params():
     for target_date in TARGET_POINTS:
         lat, lng, target_point = target_date
         if not isinstance(lat, float):
-            logger.error("緯度は小数で設定してください。")
-            sys.exit(1)
+            raise ValueError("緯度は小数で設定してください。")
         if not isinstance(lng, float):
-            logger.error("経度は小数で設定してください。")
+            raise ValueError("経度は小数で設定してください。")
         if not MIN_LAT <= lat <= MAX_LAT:
-            logger.error(f"緯度は{MIN_LAT}度〜{MAX_LAT}度の小数で設定してください。")
-            sys.exit(1)
+            raise ValueError(
+                f"緯度は{MIN_LAT}度〜{MAX_LAT}度の小数で設定してください。"
+            )
         if not MIN_LNG <= lng <= MAX_LNG:
-            logger.error(f"経度は{MIN_LNG}度〜{MAX_LNG}度の小数で設定してください。")
-            sys.exit(1)
+            raise ValueError(
+                f"経度は{MIN_LNG}度〜{MAX_LNG}度の小数で設定してください。"
+            )
         if not isinstance(target_point, str):
-            logger.error("地点は文字列で設定してください。")
-            sys.exit(1)
+            raise ValueError("地点は文字列で設定してください。")
 
     # 検索範囲の確認
     if not isinstance(SEARCH_RADIUS_M, int):
-        logger.error("検索範囲は整数で設定してください。")
-        sys.exit(1)
+        raise ValueError("検索範囲は整数で設定してください。")
     if not 0 < SEARCH_RADIUS_M < MAX_SEARCH_RADIUS_M:
-        logger.error(
+        raise ValueError(
             f"検索範囲は{MAX_SEARCH_RADIUS_M}m未満の自然数で設定してください。"
         )
-        sys.exit(1)
 
     # BBOXを使った絞り込みの範囲の確認
     if not isinstance(search_radius_padding_factor, float):
-        logger.error("BBOXを使った絞り込みの範囲は小数で設定してください。")
-        sys.exit(1)
+        raise ValueError("BBOXを使った絞り込みの範囲は小数で設定してください。")
     # スレッド数の確認
     if not isinstance(MAX_WORKERS, int) or MAX_WORKERS <= 0:
-        logger.error("スレッド数は自然数で設定してください。")
-        sys.exit(1)
-    # データ出力先のパスの確認
-    if not output_dir.parent.exists():
-        logger.error("ツールと同じ階層にresultディレクトリを作成してください。")
-        sys.exit(1)
+        raise ValueError("スレッド数は自然数で設定してください。")
 
 
 def get_db_config(env_path):
@@ -265,43 +258,42 @@ def get_db_config(env_path):
         if not value:
             missing_keys.append(key)
 
+    log_message = f"【接続エラー】以下の環境変数が未設定です。{', '.join(missing_keys)}"
     if missing_keys:
-        logger.error(
-            f"【接続エラー】以下の環境変数が未設定です。{', '.join(missing_keys)}"
+        logger.error(log_message)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=log_message,
         )
-        sys.exit(1)
 
     return config
 
 
-def save_to_csv(file_path, rows):
-    """
-    データの取得結果をCSVで保存する
-    Args:
-        file_path (Path | str): CSVファイルのパス
-        rows (list): 取得したデータのリスト
-    Return:
-        なし
-    """
+setup_logger(log_dir)
+logger = logging.getLogger()
 
-    csv_header = ["id", "name", "category", "geom"]
-
-    with open(file_path, mode="w", encoding="utf-8", newline="") as f:
-        write = csv.writer(f)
-        write.writerow(csv_header)
-        write.writerows(rows)
-        logger.info(f"{len(rows)}件のデータを書き込みました。")
+app = FastAPI()
 
 
-if __name__ == "__main__":
-    # ロガー取得
+@app.get("/")
+async def index():
+
+    return {"message": "Hello Deta!"}
+
+
+@app.get("/result")
+async def get_search_info():
     setup_logger(log_dir)
     logger = logging.getLogger()
 
     start_time = time.perf_counter()
     logger.info("---- 処理開始 ----")
     # 変数の確認
-    validate_params()
+    try:
+        validate_params()
+    except ValueError as e:
+        logger.error(f"【パラメータエラー】: {e}")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     # DB接続情報取得
     db_config = get_db_config(env_dir)
 
@@ -346,14 +338,22 @@ if __name__ == "__main__":
                 logger.error(f"【予期せぬ例外】{label}: {e}")
     logger.info(f"スレッド処理終了: 成功地点 {success_count}/{len(TARGET_POINTS)}")
 
-    if len(all_combined_rows) > 0:
-        save_to_csv(output_dir, all_combined_rows)
-    if is_success and len(all_combined_rows) == 0:
-        logger.info("データ取得件数が0件のため書き込み処理をスキップ")
-
     end_time = time.perf_counter()
     actual_time = end_time - start_time
     if success_count == len(TARGET_POINTS):
         logger.info(f"---- 正常終了 ---- 実行時間: {actual_time:.3f} 秒 ")
+        return {"result": all_combined_rows}
     else:
         logger.info(f"---- 異常終了 ---- 実行時間: {actual_time:.3f} 秒")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal Server Error",
+        )
+
+
+@app.post("/")
+async def calc(
+    data: Data,
+):
+    result = data.x * data.y
+    return {"result": result}
