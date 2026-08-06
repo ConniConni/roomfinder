@@ -259,11 +259,13 @@ def get_db_config(env_path):
         if not value:
             missing_keys.append(key)
 
+    log_message = f"【接続エラー】以下の環境変数が未設定です。{', '.join(missing_keys)}"
     if missing_keys:
-        logger.error(
-            f"【接続エラー】以下の環境変数が未設定です。{', '.join(missing_keys)}"
+        logger.error(log_message)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=log_message,
         )
-        sys.exit(1)
 
     return config
 
